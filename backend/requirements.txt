@@ -2,7 +2,12 @@ flask
 flask-cors
 flask-sqlalchemy
 flask-jwt-extended
+pymysql
 pydantic
 email-validator
 werkzeug
 python-dotenv
+numpy
+scikit-learn
+pypdf
+pdfplumber

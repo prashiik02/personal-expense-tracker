@@ -4,6 +4,8 @@ from flask_jwt_extended import JWTManager
 
 from models import db
 from auth.routes import auth_bp
+from categorization.routes import categorization_bp
+from statements.routes import statements_bp
 from config import Config
 
 
@@ -19,6 +21,8 @@ def create_app():
     JWTManager(app)
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(categorization_bp)
+    app.register_blueprint(statements_bp)
 
     return app
 

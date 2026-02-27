@@ -22,7 +22,7 @@ def register_user(data):
     db.session.add(user)
     db.session.commit()
 
-    token = create_access_token(identity=user.id)
+    token = create_access_token(identity=str(user.id))
 
     return {
         "id": user.id,
@@ -42,7 +42,7 @@ def login_user(data):
     if not check_password_hash(user.password, data.password):
         return None, "Invalid email or password"
 
-    token = create_access_token(identity=user.id)
+    token = create_access_token(identity=str(user.id))
 
     return {
         "id": user.id,

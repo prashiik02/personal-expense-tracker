@@ -1,6 +1,6 @@
 import React from "react";
 import { createContext, useState, useEffect } from "react";
-import axios from "axios";
+import { loginUser, registerUser } from "../api/authApi";
 
 export const AuthContext = createContext();
 
@@ -13,16 +13,17 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const res = await axios.post("http://localhost:5000/auth/login", {
-      email,
-      password,
-    });
-    setUser(res.data);
-    localStorage.setItem("user", JSON.stringify(res.data));
+    const data = await loginUser({ email, password });
+    setUser(data);
+    localStorage.setItem("user", JSON.stringify(data));
+    return data;
   };
 
   const register = async (data) => {
-    await axios.post("http://localhost:5000/auth/register", data);
+    const res = await registerUser(data);
+    setUser(res);
+    localStorage.setItem("user", JSON.stringify(res));
+    return res;
   };
 
   const logout = () => {
