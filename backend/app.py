@@ -8,6 +8,10 @@ from categorization.routes import categorization_bp
 from statements.routes import statements_bp
 from config import Config
 
+# Ensure all models are imported before db.create_all()
+import models.user_model  # noqa: F401
+import models.transaction_model  # noqa: F401
+
 
 def create_app():
     app = Flask(__name__)

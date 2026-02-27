@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from pydantic import ValidationError
 
 from smart_categorization.core.pipeline import Transaction
+from models import db
+from models.transaction_model import TransactionRecord
 
 from .csv_parser import parse_transactions_csv
 from .pipeline_service import get_pipeline
@@ -42,7 +44,24 @@ def categorize_single():
         line_items=[li.model_dump() for li in (data.line_items or [])] or None,
     )
     result = pipeline.process(txn)
-    return jsonify(result.to_dict()), 200
+    payload = result.to_dict()
+
+    # Persist for this user (avoid duplicates)
+    user_id = int(get_jwt_identity())
+    record = TransactionRecord.from_processed(
+        user_id=user_id,
+        processed=payload,
+        source="manual",
+        bank=None,
+    )
+    exists = TransactionRecord.query.filter_by(
+        user_id=user_id, hash_key=record.hash_key
+    ).first()
+    if not exists:
+        db.session.add(record)
+        db.session.commit()
+
+    return jsonify(payload), 200
 
 
 @categorization_bp.route("/batch", methods=["POST"])
@@ -75,9 +94,28 @@ def categorize_batch():
         )
         processed.append(pipeline.process(txn))
 
+    processed_dicts = [p.to_dict() for p in processed]
+
+    # Persist all processed transactions for this user, deduplicated
+    user_id = int(get_jwt_identity())
+    for row in processed_dicts:
+        record = TransactionRecord.from_processed(
+            user_id=user_id,
+            processed=row,
+            source="csv" if data.csv_text else "batch",
+            bank=None,
+        )
+        exists = TransactionRecord.query.filter_by(
+            user_id=user_id, hash_key=record.hash_key
+        ).first()
+        if exists:
+            continue
+        db.session.add(record)
+    db.session.commit()
+
     payload = {"count": len(processed)}
     if data.return_results:
-        payload["results"] = [p.to_dict() for p in processed]
+        payload["results"] = processed_dicts
     if data.include_summary:
         payload["summary"] = pipeline.get_summary(processed)
 
@@ -105,7 +143,24 @@ def categorize_sms():
         amount=parsed["amount"],
     )
     result = pipeline.process(txn)
-    return jsonify({"parsed": parsed, "result": result.to_dict()}), 200
+    result_dict = result.to_dict()
+
+    # Persist SMS-sourced transaction
+    user_id = int(get_jwt_identity())
+    record = TransactionRecord.from_processed(
+        user_id=user_id,
+        processed=result_dict,
+        source="sms",
+        bank=data.bank,
+    )
+    exists = TransactionRecord.query.filter_by(
+        user_id=user_id, hash_key=record.hash_key
+    ).first()
+    if not exists:
+        db.session.add(record)
+        db.session.commit()
+
+    return jsonify({"parsed": parsed, "result": result_dict}), 200
 
 
 @categorization_bp.route("/correction", methods=["POST"])

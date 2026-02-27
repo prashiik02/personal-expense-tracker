@@ -13,3 +13,8 @@ export const analyzeStatementPdf = async ({ file, bank = "generic", maxPages = 2
   return res.data;
 };
 
+export const fetchDashboardOverview = async () => {
+  const res = await API.get("/statements/dashboard");
+  return res.data;
+};
+

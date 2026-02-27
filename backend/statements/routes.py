@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import tempfile
+import json
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from categorization.pipeline_service import get_pipeline
 from smart_categorization.core.pipeline import Transaction
@@ -11,6 +12,8 @@ from smart_categorization.core.pipeline import Transaction
 from .analysis import compute_time_aggregates, compute_top_merchants
 from .parse_lines import parse_statement_text
 from .pdf_extract import extract_text
+from models import db
+from models.transaction_model import TransactionRecord
 
 
 statements_bp = Blueprint("statements", __name__, url_prefix="/statements")
@@ -92,6 +95,24 @@ def analyze_pdf_statement():
             processed_objs.append(pipeline.process(txn))
 
         processed = [o.to_dict() for o in processed_objs]
+
+        # Persist processed transactions for the current user (id from JWT)
+        user_id = int(get_jwt_identity())
+        for row in processed:
+            # Build record and check for duplicates via hash_key
+            record = TransactionRecord.from_processed(
+                user_id=user_id,
+                processed=row,
+                source="pdf",
+                bank=bank,
+            )
+            exists = TransactionRecord.query.filter_by(
+                user_id=user_id, hash_key=record.hash_key
+            ).first()
+            if exists:
+                continue
+            db.session.add(record)
+        db.session.commit()
         time_aggs = compute_time_aggregates(processed)
         summary = pipeline.get_summary(processed_objs)
 
@@ -133,4 +154,72 @@ def analyze_pdf_statement():
             os.remove(tmp_path)
         except Exception:
             pass
+
+
+@statements_bp.route("/dashboard", methods=["GET"])
+@jwt_required()
+def dashboard_overview():
+    """
+    Return aggregated analytics for all stored transactions
+    belonging to the current user.
+    """
+    user_id = int(get_jwt_identity())
+
+    records = (
+        TransactionRecord.query.filter_by(user_id=user_id)
+        .order_by(TransactionRecord.date, TransactionRecord.id)
+        .all()
+    )
+
+    processed_like = []
+    for r in records:
+        try:
+            tags = json.loads(r.tags_json) if r.tags_json else []
+        except Exception:
+            tags = []
+        processed_like.append(
+            {
+                "transaction_id": r.external_id or str(r.id),
+                "date": r.date,
+                "description": r.description,
+                "amount": float(r.amount or 0.0),
+                "currency": r.currency,
+                "category": r.category,
+                "subcategory": r.subcategory,
+                "merchant_name": r.merchant_name,
+                "charge_type": r.charge_type,
+                "is_p2p": bool(r.is_p2p),
+                "p2p_direction": r.p2p_direction,
+                "p2p_counterparty": r.p2p_counterparty,
+                "tags": tags,
+            }
+        )
+
+    time_aggs = compute_time_aggregates(processed_like)
+    top_merchants = compute_top_merchants(processed_like, limit=12)
+
+    categories = sorted({r["category"] for r in processed_like if r.get("category")})
+    subcategories = sorted(
+        {
+            f"{(r.get('category') or 'Unknown')} > {(r.get('subcategory') or 'Unknown')}"
+            for r in processed_like
+            if r.get("category")
+        }
+    )
+    charge_types = sorted({r.get("charge_type") for r in processed_like if r.get("charge_type")})
+    tags_all = sorted({t for r in processed_like for t in (r.get("tags") or [])})
+
+    return jsonify(
+        {
+            "transactions_count": len(processed_like),
+            "time_aggregates": time_aggs,
+            "top_merchants": top_merchants,
+            "filters": {
+                "categories": categories,
+                "subcategories": subcategories,
+                "charge_types": charge_types,
+                "tags": tags_all,
+            },
+        }
+    ), 200
 
