@@ -4,7 +4,7 @@ import TransactionTable from "../components/TransactionTable";
 import MonthlyChart from "../components/MonthlyChart";
 import SummaryCard from "../components/SummaryCard";
 import InsightCard from "../components/InsightCard";
-
+import React from "react";
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(null);

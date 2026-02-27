@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-
+import React from "react";
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -10,7 +10,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     await login(form.email, form.password);
-    navigate("/");
+    navigate("Dashboard");
   };
 
   return (

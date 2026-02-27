@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-
+import React from "react";
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
