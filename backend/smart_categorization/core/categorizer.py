@@ -16,6 +16,7 @@ from datetime import datetime
 
 import tempfile
 import numpy as np
+import warnings
 
 # Cross-platform temp directory (works on Windows, Mac, Linux, Colab)
 _TMPDIR = tempfile.gettempdir()
@@ -146,11 +147,48 @@ class MLCategorizer:
     def _load_or_train(self):
         if os.path.exists(self.model_path):
             try:
+                # Older pickled models from a different scikit-learn version can
+                # trigger InconsistentVersionWarning and lead to subtle bugs.
+                # We treat those as "invalid" and retrain on the current
+                # version instead of reusing the old pickle.
                 with open(self.model_path, 'rb') as f:
-                    saved = pickle.load(f)
-                    self.vectorizer = saved['vectorizer']
-                    self.model = saved['model']
-                    self.label_encoder = saved['label_encoder']
+                    try:
+                        from sklearn.exceptions import InconsistentVersionWarning  # type: ignore
+                    except Exception:
+                        InconsistentVersionWarning = Warning  # fallback type
+
+                    with warnings.catch_warnings(record=True) as caught:
+                        warnings.simplefilter("always", InconsistentVersionWarning)
+                        saved = pickle.load(f)
+
+                    has_inconsistent = any(
+                        issubclass(w.category, InconsistentVersionWarning)
+                        for w in caught
+                    )
+
+                    # Also check embedded sklearn version if present.
+                    sklearn_version = None
+                    try:
+                        from sklearn import __version__ as sk_version  # type: ignore
+                        sklearn_version = sk_version
+                    except Exception:
+                        sklearn_version = None
+
+                    saved_version = None
+                    if isinstance(saved, dict):
+                        saved_version = saved.get("sklearn_version")
+
+                    if has_inconsistent or (
+                        sklearn_version is not None
+                        and saved_version is not None
+                        and saved_version != sklearn_version
+                    ):
+                        # Force retrain on mismatch; ignore old pickle.
+                        raise RuntimeError("Incompatible scikit-learn model version; retraining.")
+
+                    self.vectorizer = saved["vectorizer"]
+                    self.model = saved["model"]
+                    self.label_encoder = saved["label_encoder"]
                 return
             except Exception:
                 pass
@@ -162,6 +200,7 @@ class MLCategorizer:
             from sklearn.feature_extraction.text import TfidfVectorizer
             from sklearn.linear_model import LogisticRegression
             from sklearn.preprocessing import LabelEncoder
+            from sklearn import __version__ as sk_version
         except ImportError:
             print("scikit-learn not installed. Run: pip install scikit-learn")
             return
@@ -194,11 +233,17 @@ class MLCategorizer:
             if save_dir:
                 os.makedirs(save_dir, exist_ok=True)
             with open(self.model_path, 'wb') as f:
-                pickle.dump({
-                    'vectorizer': self.vectorizer,
-                    'model': self.model,
-                    'label_encoder': self.label_encoder
-                }, f)
+                pickle.dump(
+                    {
+                        "vectorizer": self.vectorizer,
+                        "model": self.model,
+                        "label_encoder": self.label_encoder,
+                        # Embed the sklearn version used to train this model
+                        # so that future loads can detect mismatches cleanly.
+                        "sklearn_version": sk_version,
+                    },
+                    f,
+                )
         except Exception as e:
             print(f"  WARN: Model save skipped ({e}). Running in-memory; continuing.")
     
@@ -209,8 +254,18 @@ class MLCategorizer:
         
         processed = self._preprocess(description)
         X = self.vectorizer.transform([processed])
-        
-        proba = self.model.predict_proba(X)[0]
+
+        # Older pickled models from a different scikit-learn version can break
+        # predict_proba (AttributeError: LogisticRegression has no attribute multi_class).
+        # If that happens, retrain from seed data on the current version.
+        try:
+            proba = self.model.predict_proba(X)[0]
+        except AttributeError:
+            # Incompatible or corrupt model → retrain and try once more
+            self.train(TRAINING_DATA)
+            if self.model is None:
+                return "Shopping", "Electronics", 0.1
+            proba = self.model.predict_proba(X)[0]
         top_idx = np.argmax(proba)
         confidence = float(proba[top_idx])
         
@@ -324,19 +379,26 @@ class SmartCategorizationEngine:
     def __init__(self, feedback_path: str = os.path.join(_TMPDIR, "feedback_store.json"),
                  model_path: str = os.path.join(_TMPDIR, "cat_model.pkl")):
         from ..data.merchant_db import find_merchant
+        from .llm_categorizer import LLMCategorizer
         self.find_merchant = find_merchant
         
         self.feedback = FeedbackStore(feedback_path)
         self.ml = MLCategorizer(model_path)
+        self.llm = LLMCategorizer()
     
     def categorize(self, description: str, amount: float,
-                   transaction_id: Optional[str] = None) -> CategorizationResult:
-        
+                   transaction_id: Optional[str] = None,
+                   use_llm_only: bool = False) -> CategorizationResult:
+        """
+        Categorize a transaction.
+        When use_llm_only=True (e.g. for PDF statements), skip merchant DB and ML,
+        and use Groq LLM directly for better accuracy on bank narrations.
+        """
         txn_id = transaction_id or hashlib.md5(
             f"{description}{amount}".encode()).hexdigest()[:8]
         
-        # 1. Find merchant from DB
-        merchant = self.find_merchant(description)
+        # 1. Find merchant from DB (skipped when use_llm_only)
+        merchant = None if use_llm_only else self.find_merchant(description)
         merchant_name = merchant.name if merchant else None
         
         # 2. Check user override (highest priority)
@@ -358,7 +420,29 @@ class SmartCategorizationEngine:
                 tags=self._generate_tags(cat, subcat, merchant, amount)
             )
         
-        # 3. Merchant DB lookup
+        # 2b. PDF / use_llm_only: skip merchant DB and ML, use Groq LLM directly
+        if use_llm_only and self.llm.enabled():
+            llm_res = self.llm.categorize(description, amount)
+            if llm_res:
+                return CategorizationResult(
+                    transaction_id=txn_id,
+                    description=description,
+                    amount=amount,
+                    predicted_category=llm_res.category,
+                    predicted_subcategory=llm_res.subcategory,
+                    confidence=llm_res.confidence,
+                    method="groq_llm",
+                    merchant_record=None,
+                    charge_type=None,
+                    business_type=None,
+                    logo_url=None,
+                    tags=self._generate_tags(llm_res.category, llm_res.subcategory, None, amount),
+                    needs_review=llm_res.confidence < 0.70
+                )
+            # LLM failed or disabled; fall back to ML
+            use_llm_only = False
+        
+        # 3. Merchant DB lookup (skipped when use_llm_only)
         if merchant:
             return CategorizationResult(
                 transaction_id=txn_id,
@@ -378,7 +462,17 @@ class SmartCategorizationEngine:
         
         # 4. ML model fallback
         cat, subcat, confidence = self.ml.predict(description)
-        return CategorizationResult(
+
+        # Threshold for when we consider ML "low confidence" and should lean on LLM.
+        # Higher threshold => LLM used more often.
+        try:
+            low_conf_threshold = float(os.getenv("ML_LOW_CONF_THRESHOLD", "0.80"))
+        except ValueError:
+            low_conf_threshold = 0.80
+
+        needs_review = confidence < low_conf_threshold
+
+        result = CategorizationResult(
             transaction_id=txn_id,
             description=description,
             amount=amount,
@@ -386,9 +480,25 @@ class SmartCategorizationEngine:
             predicted_subcategory=subcat,
             confidence=confidence,
             method="ml_model",
-            needs_review=confidence < 0.60,
+            needs_review=needs_review,
             tags=self._generate_tags(cat, subcat, None, amount)
         )
+
+        # 5. LLM fallback (Groq-backed, via former Ollama client) when ML is unsure
+        # OR when we have no merchant match. We never override a strong merchant_db
+        # match above, only unknown merchants.
+        if self.llm.enabled():
+            # Only run LLM when merchant is unknown (merchant DB did not match).
+            llm_res = self.llm.categorize(description, amount)
+            if llm_res and (needs_review or llm_res.confidence >= result.confidence):
+                result.predicted_category = llm_res.category
+                result.predicted_subcategory = llm_res.subcategory
+                result.confidence = llm_res.confidence
+                result.method = "groq_llm"
+                result.needs_review = llm_res.confidence < 0.70
+                result.tags = self._generate_tags(llm_res.category, llm_res.subcategory, None, amount)
+
+        return result
     
     def apply_correction(self, transaction_id: str, description: str,
                          merchant_name: Optional[str],

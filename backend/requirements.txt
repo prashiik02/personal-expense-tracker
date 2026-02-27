@@ -8,6 +8,7 @@ email-validator
 werkzeug
 python-dotenv
 numpy
-scikit-learn
+scikit-learn==1.5.2
 pypdf
 pdfplumber
+groq

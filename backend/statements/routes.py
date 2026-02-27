@@ -10,8 +10,15 @@ from categorization.pipeline_service import get_pipeline
 from smart_categorization.core.pipeline import Transaction
 
 from .analysis import compute_time_aggregates, compute_top_merchants
-from .parse_lines import parse_statement_text
-from .pdf_extract import extract_text
+from .parse_lines import (
+    parse_statement_text,
+    ParsedTxn,
+    try_parse_tables,
+    _is_valid_date,
+    _is_valid_description,
+)
+from .pdf_extract import extract_text, extract_tables
+from .llm_fallback import parse_bank_statement_with_llm
 from models import db
 from models.transaction_model import TransactionRecord
 
@@ -70,12 +77,84 @@ def analyze_pdf_statement():
                 400,
             )
 
-        parsed = parse_statement_text(text, bank=bank, currency=currency)
+        parsed: list[ParsedTxn] = []
+
+        # 1) Try table extraction first (UCO, HDFC, SBI-style tabular statements).
+        try:
+            tables = extract_tables(tmp_path, max_pages=max_pages)
+            parsed = try_parse_tables(tables, currency=currency)
+        except Exception:
+            pass
+
+        # 2) Fall back to text line parsing if table parsing failed or found nothing.
+        if not parsed:
+            parsed = parse_statement_text(text, bank=bank, currency=currency)
+
+        # 3) If that fails (or found very few rows), try Groq LLM parser.
+        # Regex can partially match header/noise; LLM often extracts more from varied formats.
+        if not parsed or (len(parsed) < 3 and len(text.strip()) > 500):
+            llm_txns = parse_bank_statement_with_llm(text)
+            llm_parsed = []
+            for idx, t in enumerate(llm_txns, start=1):
+                try:
+                    date = str(t.get("date") or "").strip()
+                    narration = (
+                        str(t.get("narration") or t.get("description") or "").strip()
+                    )
+                    if not date:
+                        continue
+                    if not narration:
+                        narration = str(t.get("particulars") or t.get("remarks") or "").strip()
+                    if not narration:
+                        continue
+
+                    raw_amount = float(t.get("amount") or 0.0)
+                    t_type = str(t.get("type") or "").strip().lower()
+                    if t_type == "credit":
+                        amount = -abs(raw_amount)
+                    else:
+                        amount = abs(raw_amount)
+
+                    txn_id = (
+                        str(t.get("reference") or "").strip()
+                        or f"LLM_{idx:05d}"
+                    )
+
+                    # Reject invalid dates (e.g. 2025-12-84) and numeric-only descriptions
+                    if not _is_valid_date(date) or not _is_valid_description(narration):
+                        continue
+
+                    llm_parsed.append(
+                        ParsedTxn(
+                            transaction_id=txn_id,
+                            date=date,
+                            description=narration,
+                            amount=amount,
+                            currency=currency,
+                            source_line=None,
+                        )
+                    )
+                except Exception:
+                    # Skip any malformed rows from the LLM output.
+                    continue
+
+            # Use LLM result if it found more transactions; else keep regex result
+            if llm_parsed:
+                parsed = llm_parsed
+            # else: parsed stays as regex result (may be empty or 1–2 items)
+
+        # 4) Final validation: drop invalid transactions before categorization
+        parsed = [
+            p
+            for p in parsed
+            if _is_valid_date(p.date) and _is_valid_description(p.description)
+        ]
+
         if not parsed:
             return (
                 jsonify(
                     {
-                        "error": "Could not detect transactions in this PDF with current parser.",
+                        "error": "Could not detect transactions in this PDF with available parsers.",
                         "hint": "Try selecting the correct bank, or share a sample (with sensitive data removed) to improve the parser.",
                     }
                 ),
@@ -92,7 +171,8 @@ def analyze_pdf_statement():
                 amount=p.amount,
                 currency=p.currency,
             )
-            processed_objs.append(pipeline.process(txn))
+            # PDF transactions: use Groq LLM only (skip ML model)
+            processed_objs.append(pipeline.process(txn, use_llm_only=True))
 
         processed = [o.to_dict() for o in processed_objs]
 

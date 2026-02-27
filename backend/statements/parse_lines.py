@@ -3,10 +3,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, List, Optional, Literal
+from typing import Iterable, List, Optional, Literal, Tuple
 
 
-BankId = Literal["generic", "hdfc", "sbi", "icici", "axis"]
+BankId = Literal["generic", "hdfc", "sbi", "icici", "axis", "uco"]
 
 
 @dataclass
@@ -22,8 +22,11 @@ class ParsedTxn:
 _DATE_PATTERNS = [
     ("%d/%m/%Y", re.compile(r"\b(\d{1,2}/\d{1,2}/\d{4})\b")),
     ("%d/%m/%y", re.compile(r"\b(\d{1,2}/\d{1,2}/\d{2})\b")),
+    ("%d-%m-%Y", re.compile(r"\b(\d{1,2}-\d{1,2}-\d{4})\b")),
+    ("%d-%m-%y", re.compile(r"\b(\d{1,2}-\d{1,2}-\d{2})\b")),
     ("%d-%b-%y", re.compile(r"\b(\d{1,2}-[A-Za-z]{3}-\d{2})\b")),
     ("%d-%b-%Y", re.compile(r"\b(\d{1,2}-[A-Za-z]{3}-\d{4})\b")),
+    ("%d%b,%Y", re.compile(r"\b(\d{1,2}[A-Za-z]{3},\d{4})\b")),
     ("%b %d, %Y", re.compile(r"\b([A-Za-z]{3}\s+\d{1,2},\s+\d{4})\b")),
 ]
 
@@ -36,6 +39,33 @@ def _to_iso_date(s: str) -> Optional[str]:
         except ValueError:
             continue
     return None
+
+
+def _is_valid_date(iso: str) -> bool:
+    """Reject invalid dates like 2025-12-84 (day > 31)."""
+    if not iso or len(iso) < 10:
+        return False
+    try:
+        parts = iso.split("-")
+        if len(parts) != 3:
+            return False
+        y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+        if m < 1 or m > 12 or d < 1 or d > 31:
+            return False
+        datetime(y, m, d)  # raises if invalid (e.g. Feb 30)
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def _is_valid_description(desc: str) -> bool:
+    """Reject descriptions that are purely numeric (amounts misparsed as description)."""
+    if not desc or len(desc.strip()) < 3:
+        return False
+    stripped = re.sub(r"[\s,.]", "", desc)
+    if not stripped:
+        return False
+    return not stripped.isdigit()
 
 
 def _find_date(line: str) -> Optional[str]:
@@ -66,6 +96,81 @@ def _looks_like_phonepe_statement(lines: List[str]) -> bool:
     ):
         return True
     return False
+
+
+def _looks_like_gpay_statement(lines: List[str]) -> bool:
+    head = "\n".join(lines[:80]).lower()
+    if "transaction statement" in head and "gpay" in head:
+        return True
+    if "transaction statement" in head and "upitransactionid" in head:
+        return True
+    if "receivedfrom" in head or "paidto" in head:
+        if "upitransactionid" in head or "transaction statement" in head:
+            return True
+    return False
+
+
+_GPAY_ROW_RX = re.compile(
+    r"(\d{1,2}[A-Za-z]{3},\d{4})\s+(Receivedfrom|Paidto)(.+?)\s*[₹Rs.]?\s*([\d,]+(?:\.\d+)?)",
+    re.I,
+)
+
+
+def parse_gpay_statement(text: str, currency: str = "INR") -> List[ParsedTxn]:
+    """
+    Parses Google Pay (GPay) UCO Bank style statement.
+    Format: 09Jan,2026 ReceivedfromSakshiDivekar ₹100
+            or 09Jan,2026 PaidtoMRYOGESHSHIVKANTHBIRAJDAR ₹60
+    """
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    out: List[ParsedTxn] = []
+    seq = 1
+
+    for ln in lines:
+        if "Date&time" in ln or "Transactionstatementperiod" in ln:
+            continue
+        if "Note:" in ln or "Page" in ln.lower():
+            continue
+
+        m = _GPAY_ROW_RX.search(ln)
+        if not m:
+            continue
+
+        date_raw = m.group(1).strip()
+        txn_type = m.group(2).strip().lower()
+        desc = m.group(3).strip()
+        amt_raw = m.group(4).replace(",", "")
+
+        iso = _to_iso_date(date_raw)
+        if not iso or not _is_valid_date(iso):
+            continue
+
+        try:
+            amt = float(amt_raw)
+        except ValueError:
+            continue
+
+        if amt <= 0:
+            continue
+
+        signed_amt = -amt if txn_type == "receivedfrom" else amt
+        full_desc = f"{txn_type.upper()} {desc}".strip()
+        if not _is_valid_description(full_desc):
+            continue
+
+        out.append(
+            ParsedTxn(
+                transaction_id=f"PDF_{seq:05d}",
+                date=iso,
+                description=full_desc,
+                amount=signed_amt,
+                currency=currency,
+                source_line=ln,
+            )
+        )
+        seq += 1
+
+    return out
 
 
 def parse_phonepe_statement(text: str, currency: str = "INR") -> List[ParsedTxn]:
@@ -185,6 +290,197 @@ def _guess_debit_credit(line: str, nums: List[float]) -> Optional[float]:
     return abs(nums[-1])
 
 
+_UCO_HEADER_ALIASES = {
+    "date": ["date", "txn date", "transaction date", "value date"],
+    "particulars": ["particulars", "description", "narration", "remarks", "details"],
+    "withdrawals": ["withdrawals", "withdrawal", "debit", "dr", "withdrawal amt"],
+    "deposits": ["deposits", "deposit", "credit", "cr", "deposit amt"],
+    "balance": ["balance", "closing balance", "available balance"],
+}
+
+
+def _find_col_index(headers: List[str], aliases: List[str]) -> int | None:
+    for i, h in enumerate(headers):
+        h_lower = (h or "").strip().lower()
+        if h_lower in aliases or any(a in h_lower for a in aliases):
+            return i
+    return None
+
+
+def parse_uco_table_rows(rows: List[List[str | None]], currency: str = "INR") -> List[ParsedTxn]:
+    """
+    Parse UCO / similar bank statement table: Date | Particulars | Withdrawals | Deposits | Balance.
+    Returns list of ParsedTxn; skips invalid dates and numeric-only descriptions.
+    """
+    if not rows or len(rows) < 2:
+        return []
+    header_row = [str(c or "").strip() for c in rows[0]]
+    date_idx = _find_col_index(header_row, _UCO_HEADER_ALIASES["date"])
+    part_idx = _find_col_index(header_row, _UCO_HEADER_ALIASES["particulars"])
+    wdr_idx = _find_col_index(header_row, _UCO_HEADER_ALIASES["withdrawals"])
+    dep_idx = _find_col_index(header_row, _UCO_HEADER_ALIASES["deposits"])
+
+    if date_idx is None or part_idx is None:
+        return []
+    if wdr_idx is None and dep_idx is None:
+        return []
+
+    def _amount(val: str | None) -> float:
+        if val is None:
+            return 0.0
+        cleaned = re.sub(r"[₹Rs,\s]", "", str(val)).strip()
+        try:
+            return abs(float(cleaned))
+        except ValueError:
+            return 0.0
+
+    out: List[ParsedTxn] = []
+    seq = 1
+    max_col = max(i for i in [date_idx, part_idx, wdr_idx, dep_idx] if i is not None)
+    for row in rows[1:]:
+        if not row or len(row) <= max_col:
+            continue
+        date_raw = str(row[date_idx] or "").strip()
+        particulars = str(row[part_idx] or "").strip()
+        wdr_val = _amount(row[wdr_idx]) if wdr_idx is not None and wdr_idx < len(row) else 0.0
+        dep_val = _amount(row[dep_idx]) if dep_idx is not None and dep_idx < len(row) else 0.0
+
+        iso = _to_iso_date(date_raw)
+        if not iso or not _is_valid_date(iso):
+            continue
+        if not _is_valid_description(particulars):
+            continue
+        if wdr_val > 0 and dep_val > 0:
+            continue  # skip ambiguous row
+        if wdr_val <= 0 and dep_val <= 0:
+            continue
+        amount = wdr_val if wdr_val > 0 else -dep_val
+        out.append(
+            ParsedTxn(
+                transaction_id=f"PDF_{seq:05d}",
+                date=iso,
+                description=particulars,
+                amount=amount,
+                currency=currency,
+                source_line=None,
+            )
+        )
+        seq += 1
+    return out
+
+
+def parse_sbi_yono_table_rows(rows: List[List[str | None]], currency: str = "INR") -> List[ParsedTxn]:
+    """
+    Parse SBI Yono statement table: 7 columns -
+    Col 0: Date, Col 1: Value date, Col 2: Description (WDL TFR / DEP TFR / ATM WDL),
+    Col 3: "-", Col 4: Debit, Col 5: Credit, Col 6: Balance.
+    """
+    if not rows or len(rows) < 2:
+        return []
+    out: List[ParsedTxn] = []
+    seq = 1
+
+    def _amount(v: str | None) -> float:
+        if not v:
+            return 0.0
+        # Remove currency symbols and thousands commas, but keep decimal point
+        cleaned = re.sub(r"[₹Rs,\s]", "", str(v)).strip()
+        try:
+            return abs(float(cleaned))
+        except ValueError:
+            return 0.0
+
+    for row in rows[1:]:
+        if not row or len(row) < 6:
+            continue
+        date_raw = str(row[0] or row[1] or "").strip()
+        desc_raw = str(row[2] or "").strip().replace("\n", " ")
+        debit_val = str(row[4] or "").strip() if len(row) > 4 else ""
+        credit_val = str(row[5] or "").strip() if len(row) > 5 else ""
+
+        if not date_raw or not desc_raw:
+            continue
+
+        iso = _to_iso_date(date_raw)
+        if not iso or not _is_valid_date(iso):
+            continue
+
+        # WDL TFR, ATM WDL = debit; DEP TFR = credit
+        desc_upper = desc_raw.upper()
+        if "WDL TFR" in desc_upper or "ATM WDL" in desc_upper or "WDL" in desc_upper:
+            amt = _amount(debit_val)
+            if amt <= 0:
+                continue
+            signed_amt = amt
+        elif "DEP TFR" in desc_upper or "DEP" in desc_upper:
+            amt = _amount(credit_val)
+            if amt <= 0:
+                continue
+            signed_amt = -amt
+        else:
+            continue
+
+        if not _is_valid_description(desc_raw):
+            continue
+
+        out.append(
+            ParsedTxn(
+                transaction_id=f"PDF_{seq:05d}",
+                date=iso,
+                description=desc_raw,
+                amount=signed_amt,
+                currency=currency,
+                source_line=None,
+            )
+        )
+        seq += 1
+
+    return out
+
+
+def _looks_like_sbi_yono_table(rows: List[List[str | None]]) -> bool:
+    """Detect SBI Yono table: 7 cols, WDL TFR or DEP TFR in col 2, dates in col 0/1."""
+    if not rows or len(rows) < 2:
+        return False
+    first_data = rows[1]
+    if len(first_data) < 6:
+        return False
+    desc = str(first_data[2] or "").upper()
+    date0 = str(first_data[0] or "").strip()
+    return ("WDL TFR" in desc or "DEP TFR" in desc or "ATM WDL" in desc) and bool(
+        re.match(r"\d{1,2}/\d{1,2}/\d{4}", date0)
+    )
+
+
+def try_parse_tables(tables: List[List[List[str | None]]], currency: str = "INR") -> List[ParsedTxn]:
+    """Try to parse any table as UCO-style or SBI Yono bank statement."""
+    sbi_yono_all: List[ParsedTxn] = []
+    for table in tables:
+        if _looks_like_sbi_yono_table(table):
+            parsed = parse_sbi_yono_table_rows(table, currency=currency)
+            if parsed:
+                # Re-number transaction IDs across pages
+                base = len(sbi_yono_all) + 1
+                for i, p in enumerate(parsed):
+                    sbi_yono_all.append(
+                        ParsedTxn(
+                            transaction_id=f"PDF_{base + i:05d}",
+                            date=p.date,
+                            description=p.description,
+                            amount=p.amount,
+                            currency=p.currency,
+                            source_line=p.source_line,
+                        )
+                    )
+    if sbi_yono_all:
+        return sbi_yono_all
+    for table in tables:
+        parsed = parse_uco_table_rows(table, currency=currency)
+        if parsed:
+            return parsed
+    return []
+
+
 def parse_statement_text(text: str, bank: BankId = "generic", currency: str = "INR") -> List[ParsedTxn]:
     """
     Best-effort parsing from extracted PDF text.
@@ -193,6 +489,8 @@ def parse_statement_text(text: str, bank: BankId = "generic", currency: str = "I
     lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
     if _looks_like_phonepe_statement(lines):
         return parse_phonepe_statement(text, currency=currency)
+    if _looks_like_gpay_statement(lines):
+        return parse_gpay_statement(text, currency=currency)
     out: List[ParsedTxn] = []
     seq = 1
 

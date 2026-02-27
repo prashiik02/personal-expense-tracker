@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import {
   Bar,
   BarChart,
@@ -170,6 +170,9 @@ export default function Categorize() {
   const [pdfBank, setPdfBank] = useState("generic");
   const [pdfMaxPages, setPdfMaxPages] = useState(20);
   const [pdfResponse, setPdfResponse] = useState(null);
+  const [pdfAnalyzing, setPdfAnalyzing] = useState(false);
+  const [pdfProgress, setPdfProgress] = useState(0);
+  const pdfTimerRef = useRef(null);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -232,6 +235,32 @@ export default function Categorize() {
   const handlePdfFile = (file) => {
     if (!file) return;
     setPdfFileName(file.name);
+  };
+
+  const startPdfProgress = () => {
+    setPdfAnalyzing(true);
+    setPdfProgress(5);
+    if (pdfTimerRef.current) {
+      clearInterval(pdfTimerRef.current);
+    }
+    pdfTimerRef.current = setInterval(() => {
+      setPdfProgress((prev) => {
+        if (prev >= 90) return prev;
+        return prev + 5;
+      });
+    }, 400);
+  };
+
+  const stopPdfProgress = () => {
+    if (pdfTimerRef.current) {
+      clearInterval(pdfTimerRef.current);
+      pdfTimerRef.current = null;
+    }
+    setPdfProgress(100);
+    setTimeout(() => {
+      setPdfAnalyzing(false);
+      setPdfProgress(0);
+    }, 600);
   };
 
   const openCorrection = (processedTxn) => {
@@ -317,6 +346,7 @@ export default function Categorize() {
           setError("Please select a PDF file.");
           return;
         }
+        startPdfProgress();
         const data = await analyzeStatementPdf({
           file,
           bank: pdfBank,
@@ -333,6 +363,9 @@ export default function Categorize() {
         "Request failed";
       setError(typeof msg === "string" ? msg : "Request failed");
     } finally {
+      if (tab === "pdf") {
+        stopPdfProgress();
+      }
       setIsLoading(false);
     }
   };
@@ -578,6 +611,64 @@ export default function Categorize() {
                 onChange={(e) => setItemsForm({ ...itemsForm, line_items_json: e.target.value })}
               />
             </label>
+          </div>
+        )}
+
+        {tab === "pdf" && (
+          <div style={{ display: "grid", gap: 10 }}>
+            <label>
+              Bank format (optional hint)
+              <select value={pdfBank} onChange={(e) => setPdfBank(e.target.value)}>
+                <option value="generic">Auto-detect</option>
+                <option value="hdfc">HDFC</option>
+                <option value="sbi">SBI</option>
+                <option value="icici">ICICI</option>
+                <option value="axis">Axis</option>
+              </select>
+            </label>
+            <label>
+              Max pages to scan
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={pdfMaxPages}
+                onChange={(e) => setPdfMaxPages(Number(e.target.value) || 1)}
+              />
+            </label>
+            <label>
+              PDF statement
+              <input id="pdf-file-input" type="file" accept="application/pdf" />
+            </label>
+            {pdfFileName && (
+              <div style={{ color: "#555", fontSize: 13 }}>
+                Selected: <strong>{pdfFileName}</strong>
+              </div>
+            )}
+            {pdfAnalyzing && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>
+                  Analyzing statement… this can take a few seconds for large PDFs.
+                </div>
+                <div
+                  style={{
+                    height: 8,
+                    borderRadius: 4,
+                    background: "#e5e7eb",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.min(100, pdfProgress)}%`,
+                      background: "#6366F1",
+                      transition: "width 0.3s ease-out",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

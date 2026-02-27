@@ -44,3 +44,29 @@ def extract_text(pdf_path: str, max_pages: int | None = 20) -> str:
 
     return extract_text_pypdf(pdf_path, max_pages=max_pages)
 
+
+def extract_tables(pdf_path: str, max_pages: int | None = 20) -> List[List[List[str | None]]]:
+    """
+    Extract tables from PDF using pdfplumber.
+    Returns a list of tables; each table is a list of rows; each row is a list of cell strings.
+    Useful for UCO/HDFC/SBI-style bank statements with tabular layout.
+    """
+    import pdfplumber
+
+    all_tables: List[List[List[str | None]]] = []
+    with pdfplumber.open(pdf_path) as pdf:
+        total = len(pdf.pages)
+        n = min(total, max_pages) if max_pages else total
+        for i in range(n):
+            page = pdf.pages[i]
+            tables = page.extract_tables() or []
+            for t in tables:
+                if t and len(t) > 0:
+                    # Normalize cells: None -> "", ensure strings
+                    rows = [
+                        [str(c).strip() if c is not None else "" for c in row]
+                        for row in t
+                    ]
+                    all_tables.append(rows)
+    return all_tables
+

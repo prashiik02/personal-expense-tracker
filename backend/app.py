@@ -17,7 +17,12 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    CORS(app)
+    # Allow frontend on Vite dev server (127.0.0.1:5173) to call this API
+    CORS(
+        app,
+        resources={r"/*": {"origins": "*"}},
+        supports_credentials=True,
+    )
 
     db.init_app(app)
     with app.app_context():

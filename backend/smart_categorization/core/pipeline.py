@@ -108,9 +108,12 @@ class SmartCategorizationPipeline:
         
         print("Pipeline ready.")
     
-    def process(self, transaction: Transaction) -> ProcessedTransaction:
+    def process(self, transaction: Transaction,
+                use_llm_only: bool = False) -> ProcessedTransaction:
         """
         Process a single transaction through the full pipeline.
+        When use_llm_only=True (e.g. for PDF statements), categorization uses
+        Groq LLM only, skipping merchant DB and ML model.
         Returns a fully enriched ProcessedTransaction.
         """
         
@@ -121,7 +124,8 @@ class SmartCategorizationPipeline:
         cat_result = self.categorizer.categorize(
             description=desc,
             amount=amt,
-            transaction_id=transaction.transaction_id
+            transaction_id=transaction.transaction_id,
+            use_llm_only=use_llm_only
         )
         
         # ── STEP 1b: P2P Detection (runs BEFORE enrichment, can override) ───
