@@ -6,11 +6,13 @@ from models import db
 from auth.routes import auth_bp
 from categorization.routes import categorization_bp
 from statements.routes import statements_bp
+from assistant.routes import assistant_bp
 from config import Config
 
 # Ensure all models are imported before db.create_all()
 import models.user_model  # noqa: F401
 import models.transaction_model  # noqa: F401
+import models.assistant_models  # noqa: F401
 
 
 def create_app():
@@ -32,6 +34,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(categorization_bp)
     app.register_blueprint(statements_bp)
+    app.register_blueprint(assistant_bp)
 
     return app
 
