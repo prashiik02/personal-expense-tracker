@@ -4,6 +4,30 @@ from collections import defaultdict
 from datetime import datetime
 from typing import List, Dict, Any, Iterable
 
+# P2P / UPI person-to-person transfers; excluded from spending analytics and dashboards.
+EXCLUDE_FROM_ANALYTICS_CATEGORY = "Transfers & Payments"
+# User-marked uncategorized; excluded from spending analytics and dashboards.
+UNCATEGORIZED_CATEGORY = "Uncategorized"
+
+# Categories that are excluded from all analytics (dashboard, reports, budgets).
+EXCLUDED_ANALYTICS_CATEGORIES = (EXCLUDE_FROM_ANALYTICS_CATEGORY, UNCATEGORIZED_CATEGORY)
+
+# Specific (category, subcategory) pairs excluded from analytics (e.g. miscategorized data).
+EXCLUDED_ANALYTICS_CATEGORY_SUBCATEGORY = (
+    ("Shopping", "Electronics"),  # exclude from dashboard and all analysis
+)
+
+
+def _is_excluded_from_analytics(r: dict) -> bool:
+    """True if this record should be excluded from spending/analytics (e.g. P2P, uncategorized)."""
+    if r.get("is_p2p") is True:
+        return True
+    cat = (r.get("category") or "").strip()
+    sub = (r.get("subcategory") or "").strip()
+    if (cat, sub) in EXCLUDED_ANALYTICS_CATEGORY_SUBCATEGORY:
+        return True
+    return cat in EXCLUDED_ANALYTICS_CATEGORIES
+
 
 def _month_key(d: str) -> str:
     # d is YYYY-MM-DD
@@ -27,6 +51,8 @@ def compute_time_aggregates(processed: List[dict]) -> dict:
     total_income = 0.0
 
     for r in processed:
+        if _is_excluded_from_analytics(r):
+            continue
         date = r.get("date") or ""
         if len(date) < 10:
             continue
@@ -83,6 +109,8 @@ def compute_top_merchants(processed: List[dict], limit: int = 10) -> List[dict]:
     totals = defaultdict(float)
     counts = defaultdict(int)
     for r in processed:
+        if _is_excluded_from_analytics(r):
+            continue
         m = r.get("merchant_name") or "Unknown"
         amt = float(r.get("amount") or 0.0)
         spend = abs(amt) if amt > 0 else 0.0

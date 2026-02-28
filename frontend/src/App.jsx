@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -11,18 +11,25 @@ import { useAuth } from "./hooks/useAuth";
 function App() {
   const { user } = useAuth();
 
+  useEffect(() => {
+    document.body.classList.add("finsight");
+    return () => document.body.classList.remove("finsight");
+  }, []);
+
   return (
     <>
       {user && <Navbar />}
-      <Routes>
-        <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
-        <Route path="/categorize" element={user ? <Categorize /> : <Navigate to="/login" />} />
-        <Route path="/assistant" element={user ? <Assistant /> : <Navigate to="/login" />} />
-        <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
-        <Route path="/signin" element={<Navigate to="/login" replace />} />
-        <Route path="/signup" element={<Navigate to="/register" replace />} />
-      </Routes>
+      <main className={user ? "finsight-app" : "finsight-app finsight-auth-wrap"}>
+        <Routes>
+          <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
+          <Route path="/categorize" element={user ? <Categorize /> : <Navigate to="/login" />} />
+          <Route path="/assistant" element={user ? <Assistant /> : <Navigate to="/login" />} />
+          <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+          <Route path="/register" element={user ? <Navigate to="/" /> : <Register />} />
+          <Route path="/signin" element={<Navigate to="/login" replace />} />
+          <Route path="/signup" element={<Navigate to="/register" replace />} />
+        </Routes>
+      </main>
     </>
   );
 }

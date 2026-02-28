@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import React from "react";
 import { Link } from "react-router-dom";
+
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -24,13 +25,17 @@ export default function Register() {
       return;
     }
     setIsSubmitting(true);
+    const income = Number(form.monthly_income);
+    if (!Number.isFinite(income) || income <= 0) {
+      setError("Please enter a valid monthly income (₹) greater than 0.");
+      return;
+    }
     try {
       const payload = {
         name: form.name,
         email: form.email,
         password: form.password,
-        monthly_income:
-          form.monthly_income === "" ? null : Number(form.monthly_income),
+        monthly_income: income,
       };
       await register(payload);
       navigate("/");
@@ -45,14 +50,20 @@ export default function Register() {
     }
   };
 
-  return (
-    <div style={{ maxWidth: 420, margin: "48px auto", padding: 16 }}>
-      <h2 style={{ marginBottom: 16 }}>Sign up</h2>
+  const labelStyle = { fontSize: "11px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px" };
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: 12 }}>
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Name</span>
+  return (
+    <div className="finsight-card" style={{ maxWidth: 420, width: "100%" }}>
+      <div style={{ marginBottom: "24px" }}>
+        <div className="finsight-logo" style={{ fontSize: "24px", marginBottom: "4px" }}>Fin<span>Sight</span></div>
+        <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>Create your account</p>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "16px" }}>
+        <label style={{ display: "grid", gap: "6px" }}>
+          <span style={labelStyle}>Name</span>
           <input
+            className="finsight-input"
             value={form.name}
             placeholder="Your name"
             autoComplete="name"
@@ -61,9 +72,10 @@ export default function Register() {
           />
         </label>
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Email</span>
+        <label style={{ display: "grid", gap: "6px" }}>
+          <span style={labelStyle}>Email</span>
           <input
+            className="finsight-input"
             value={form.email}
             placeholder="you@example.com"
             autoComplete="email"
@@ -72,19 +84,22 @@ export default function Register() {
           />
         </label>
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Monthly income (optional)</span>
+        <label style={{ display: "grid", gap: "6px" }}>
+          <span style={labelStyle}>Monthly income (₹) *</span>
           <input
+            className="finsight-input"
             value={form.monthly_income}
             placeholder="e.g. 50000"
             inputMode="decimal"
             onChange={(e) => setForm({ ...form, monthly_income: e.target.value })}
+            required
           />
         </label>
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Password</span>
+        <label style={{ display: "grid", gap: "6px" }}>
+          <span style={labelStyle}>Password</span>
           <input
+            className="finsight-input"
             value={form.password}
             type="password"
             placeholder="Create a password"
@@ -94,31 +109,33 @@ export default function Register() {
           />
         </label>
 
-        <label style={{ display: "grid", gap: 6 }}>
-          <span>Confirm password</span>
+        <label style={{ display: "grid", gap: "6px" }}>
+          <span style={labelStyle}>Confirm password</span>
           <input
+            className="finsight-input"
             value={form.confirmPassword}
             type="password"
             placeholder="Repeat password"
             autoComplete="new-password"
-            onChange={(e) =>
-              setForm({ ...form, confirmPassword: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
             required
           />
         </label>
 
         {error && (
-          <div style={{ color: "crimson", fontSize: 14 }}>{error}</div>
+          <div className="finsight-alert-banner" style={{ marginBottom: 0, padding: "10px 14px" }}>
+            <span className="finsight-alert-icon">⚠️</span>
+            <div className="finsight-alert-text" style={{ fontSize: "12px" }}>{error}</div>
+          </div>
         )}
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Creating account..." : "Create account"}
+        <button type="submit" className="finsight-btn finsight-btn-primary" disabled={isSubmitting} style={{ padding: "12px" }}>
+          {isSubmitting ? "Creating account…" : "Create account"}
         </button>
       </form>
 
-      <p style={{ marginTop: 12 }}>
-        Already have an account? <Link to="/login">Sign in</Link>
+      <p style={{ marginTop: "20px", fontSize: "12px", color: "var(--finsight-muted)" }}>
+        Already have an account? <Link to="/login" style={{ color: "var(--finsight-accent)" }}>Sign in</Link>
       </p>
     </div>
   );

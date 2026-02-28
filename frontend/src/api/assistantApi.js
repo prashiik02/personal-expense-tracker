@@ -33,3 +33,8 @@ export async function explainAnomaly(details) {
   const res = await client.post("/assistant/anomaly/explain", details);
   return res.data;
 }
+
+export async function getIncomeAdvice(month) {
+  const res = await client.get("/assistant/income-advice", { params: month ? { month } : {} });
+  return res.data;
+}

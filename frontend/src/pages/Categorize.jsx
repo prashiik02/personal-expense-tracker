@@ -19,6 +19,17 @@ import {
 } from "../api/categorizationApi";
 import { analyzeStatementPdf } from "../api/statementApi";
 
+// Categories excluded from spending analytics (dashboard, charts, summaries).
+const EXCLUDED_ANALYTICS_CATEGORIES = ["Transfers & Payments", "Uncategorized"];
+const EXCLUDED_ANALYTICS_CAT_SUB = [["Shopping", "Electronics"]];
+const isExcludedFromAnalytics = (r) => {
+  const cat = (r?.category || "").trim();
+  const sub = (r?.subcategory || "").trim();
+  if (EXCLUDED_ANALYTICS_CATEGORIES.includes(cat)) return true;
+  if (EXCLUDED_ANALYTICS_CAT_SUB.some(([c, s]) => c === cat && s === sub)) return true;
+  return false;
+};
+
 const TABS = [
   { id: "raw", label: "Raw transaction" },
   { id: "sms", label: "Bank SMS" },
@@ -70,7 +81,10 @@ function computeSpendSummary(results) {
   let income = 0;
   let needsReview = 0;
   let split = 0;
+  let count = 0;
   results.forEach((r) => {
+    if (isExcludedFromAnalytics(r)) return;
+    count += 1;
     const amt = Number(r?.amount || 0);
     if (amt > 0) spend += Math.abs(amt);
     if (amt < 0) income += Math.abs(amt);
@@ -78,7 +92,7 @@ function computeSpendSummary(results) {
     if (r?.is_split) split += 1;
   });
   return {
-    count: results.length,
+    count,
     total_spend: spend,
     total_income: income,
     net: income - spend,
@@ -90,6 +104,7 @@ function computeSpendSummary(results) {
 function groupSpendByMonth(results) {
   const map = {};
   results.forEach((r) => {
+    if (isExcludedFromAnalytics(r)) return;
     const d = String(r?.date || "");
     if (d.length < 7) return;
     const month = d.slice(0, 7);
@@ -105,6 +120,7 @@ function groupSpendByMonth(results) {
 function groupSpendByCategory(results) {
   const map = {};
   results.forEach((r) => {
+    if (isExcludedFromAnalytics(r)) return;
     const cat = r?.category || "Unknown";
     const amt = Number(r?.amount || 0);
     const spend = amt > 0 ? Math.abs(amt) : 0;
@@ -429,324 +445,199 @@ export default function Categorize() {
   }, [activeResults]);
 
   return (
-    <div style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
-      <h2 style={{ marginBottom: 8 }}>Categorize transactions</h2>
-      <p style={{ marginTop: 0, color: "#555" }}>
-        Test raw descriptions, bank SMS, CSV batches, and split line items.
-      </p>
+    <>
+      <header className="finsight-header">
+        <div>
+          <div className="finsight-card-title" style={{ marginBottom: 0 }}>Categorize transactions</div>
+          <p style={{ fontSize: "11px", color: "var(--finsight-muted)", marginTop: "4px" }}>
+            Test raw descriptions, bank SMS, CSV batches, and split line items.
+          </p>
+        </div>
+      </header>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            style={{
-              border: "1px solid #ccc",
-              padding: "8px 10px",
-              background: tab === t.id ? "#eee" : "white",
-              cursor: "pointer",
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <div className="finsight-card" style={{ marginBottom: "20px" }}>
+        <div className="finsight-card-title" style={{ marginBottom: "12px" }}>Choose input type</div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={"finsight-btn" + (tab === t.id ? " finsight-btn-primary" : "")}
+              style={{ padding: "10px 18px", fontSize: "12px" }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+        {/* Form panel — opens when a tab is selected */}
         {tab === "raw" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              Transaction ID
-              <input
-                value={rawForm.transaction_id}
-                onChange={(e) => setRawForm({ ...rawForm, transaction_id: e.target.value })}
-              />
-            </label>
-            <label>
-              Date (YYYY-MM-DD)
-              <input value={rawForm.date} onChange={(e) => setRawForm({ ...rawForm, date: e.target.value })} />
-            </label>
-            <label>
-              Description
-              <input
-                value={rawForm.description}
-                onChange={(e) => setRawForm({ ...rawForm, description: e.target.value })}
-              />
-            </label>
-            <label>
-              Amount
-              <input
-                type="number"
-                value={rawForm.amount}
-                onChange={(e) => setRawForm({ ...rawForm, amount: Number(e.target.value) })}
-              />
-            </label>
+          <div className="finsight-form-panel">
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Transaction ID</span>
+              <input className="finsight-input" value={rawForm.transaction_id} onChange={(e) => setRawForm({ ...rawForm, transaction_id: e.target.value })} placeholder="e.g. T001" />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Date (YYYY-MM-DD)</span>
+              <input className="finsight-input" value={rawForm.date} onChange={(e) => setRawForm({ ...rawForm, date: e.target.value })} placeholder="2024-01-15" />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Description</span>
+              <input className="finsight-input" value={rawForm.description} onChange={(e) => setRawForm({ ...rawForm, description: e.target.value })} placeholder="e.g. ZOMATO ORDER #789" />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Amount</span>
+              <input className="finsight-input" type="number" value={rawForm.amount} onChange={(e) => setRawForm({ ...rawForm, amount: Number(e.target.value) })} placeholder="450" />
+            </div>
+            <div className="finsight-form-actions">
+              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
+              {(result || pdfResponse) && (
+                <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(tab === "pdf" ? pdfResponse : result, null, 2))}>Download JSON</button>
+              )}
+            </div>
           </div>
         )}
 
         {tab === "sms" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              Bank
-              <select
-                value={smsForm.bank}
-                onChange={(e) => setSmsForm({ ...smsForm, bank: e.target.value })}
-              >
+          <div className="finsight-form-panel">
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Bank</span>
+              <select className="finsight-input" value={smsForm.bank} onChange={(e) => setSmsForm({ ...smsForm, bank: e.target.value })}>
                 <option value="hdfc">HDFC</option>
                 <option value="sbi">SBI</option>
               </select>
-            </label>
-            <label>
-              SMS text
-              <textarea
-                rows={5}
-                value={smsForm.sms_text}
-                onChange={(e) => setSmsForm({ ...smsForm, sms_text: e.target.value })}
-              />
-            </label>
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">SMS text</span>
+              <textarea className="finsight-input" rows={5} value={smsForm.sms_text} onChange={(e) => setSmsForm({ ...smsForm, sms_text: e.target.value })} placeholder="Paste bank SMS here" />
+            </div>
+            <div className="finsight-form-actions">
+              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
+              {(result || pdfResponse) && (
+                <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(result, null, 2))}>Download JSON</button>
+              )}
+            </div>
           </div>
         )}
 
         {tab === "batch" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={() => setBatchMode("file")}
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "6px 10px",
-                  background: batchMode === "file" ? "#eee" : "white",
-                }}
-                type="button"
-              >
-                Upload CSV
-              </button>
-              <button
-                onClick={() => setBatchMode("text")}
-                style={{
-                  border: "1px solid #ccc",
-                  padding: "6px 10px",
-                  background: batchMode === "text" ? "#eee" : "white",
-                }}
-                type="button"
-              >
-                Paste CSV text
-              </button>
+          <div className="finsight-form-panel">
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+              <button type="button" onClick={() => setBatchMode("file")} className={"finsight-btn" + (batchMode === "file" ? " finsight-btn-primary" : "")}>Upload CSV</button>
+              <button type="button" onClick={() => setBatchMode("text")} className={"finsight-btn" + (batchMode === "text" ? " finsight-btn-primary" : "")}>Paste CSV text</button>
             </div>
-
             {batchMode === "file" && (
-              <div style={{ display: "grid", gap: 8 }}>
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(e) => handleCsvFile(e.target.files?.[0])}
-                />
-                {csvFileName && (
-                  <div style={{ color: "#555", fontSize: 13 }}>
-                    Selected: <strong>{csvFileName}</strong>
-                  </div>
-                )}
+              <div className="finsight-form-row">
+                <span className="finsight-form-label">CSV file</span>
+                <input type="file" accept=".csv,text/csv" onChange={(e) => handleCsvFile(e.target.files?.[0])} style={{ fontSize: "12px", color: "var(--finsight-muted)" }} />
+                {csvFileName && <span style={{ fontSize: "12px", color: "var(--finsight-muted)", marginTop: "4px" }}>Selected: <strong style={{ color: "var(--finsight-text)" }}>{csvFileName}</strong></span>}
               </div>
             )}
-
             {batchMode === "text" && (
-              <label>
-                CSV text
-                <textarea
-                  rows={8}
-                  value={csvText}
-                  onChange={(e) => setCsvText(e.target.value)}
-                />
-              </label>
+              <div className="finsight-form-row">
+                <span className="finsight-form-label">CSV text (headers: transaction_id, date, description, amount)</span>
+                <textarea className="finsight-input" rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder={"transaction_id,date,description,amount\nA1,2024-01-15,BUNDL UPI,320"} />
+              </div>
             )}
-
-            <div style={{ color: "#555", fontSize: 13 }}>
-              Required headers: <code>transaction_id,date,description,amount</code>
-            </div>
-            <details>
-              <summary style={{ cursor: "pointer" }}>Preview (first 15 lines)</summary>
-              <pre style={{ background: "#f7f7f7", padding: 12, overflowX: "auto" }}>
-                {String(csvText || "")
-                  .split(/\r?\n/)
-                  .slice(0, 15)
-                  .join("\n")}
+            <details style={{ marginTop: "12px" }}>
+              <summary style={{ cursor: "pointer", fontSize: "12px", color: "var(--finsight-muted)" }}>Preview (first 15 lines)</summary>
+              <pre style={{ background: "var(--finsight-surface2)", padding: "12px", overflowX: "auto", fontSize: "11px", marginTop: "8px", borderRadius: "8px", border: "1px solid var(--finsight-border)" }}>
+                {String(csvText || "").split(/\r?\n/).slice(0, 15).join("\n") || "(empty)"}
               </pre>
             </details>
+            <div className="finsight-form-actions">
+              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
+              {(result || pdfResponse) && (
+                <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(result, null, 2))}>Download JSON</button>
+              )}
+              {(tab === "batch" || tab === "pdf") && filteredResults.length > 0 && (
+                <button type="button" className="finsight-btn" onClick={() => downloadText(`filtered_${tab}_${Date.now()}.csv`, toCsv(filteredResults), "text/csv")}>Download CSV (filtered)</button>
+              )}
+            </div>
           </div>
         )}
 
         {tab === "items" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              Transaction ID
-              <input
-                value={itemsForm.transaction_id}
-                onChange={(e) => setItemsForm({ ...itemsForm, transaction_id: e.target.value })}
-              />
-            </label>
-            <label>
-              Date (YYYY-MM-DD)
-              <input value={itemsForm.date} onChange={(e) => setItemsForm({ ...itemsForm, date: e.target.value })} />
-            </label>
-            <label>
-              Description
-              <input
-                value={itemsForm.description}
-                onChange={(e) => setItemsForm({ ...itemsForm, description: e.target.value })}
-              />
-            </label>
-            <label>
-              Amount
-              <input
-                type="number"
-                value={itemsForm.amount}
-                onChange={(e) => setItemsForm({ ...itemsForm, amount: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Line items JSON (array of {"name","amount"})
-              <textarea
-                rows={6}
-                value={itemsForm.line_items_json}
-                onChange={(e) => setItemsForm({ ...itemsForm, line_items_json: e.target.value })}
-              />
-            </label>
+          <div className="finsight-form-panel">
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Transaction ID</span>
+              <input className="finsight-input" value={itemsForm.transaction_id} onChange={(e) => setItemsForm({ ...itemsForm, transaction_id: e.target.value })} />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Date (YYYY-MM-DD)</span>
+              <input className="finsight-input" value={itemsForm.date} onChange={(e) => setItemsForm({ ...itemsForm, date: e.target.value })} />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Description</span>
+              <input className="finsight-input" value={itemsForm.description} onChange={(e) => setItemsForm({ ...itemsForm, description: e.target.value })} />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Amount</span>
+              <input className="finsight-input" type="number" value={itemsForm.amount} onChange={(e) => setItemsForm({ ...itemsForm, amount: Number(e.target.value) })} />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Line items JSON (array of &#123;&quot;name&quot;, &quot;amount&quot;&#125;)</span>
+              <textarea className="finsight-input" rows={6} value={itemsForm.line_items_json} onChange={(e) => setItemsForm({ ...itemsForm, line_items_json: e.target.value })} />
+            </div>
+            <div className="finsight-form-actions">
+              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
+              {(result || pdfResponse) && (
+                <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(result, null, 2))}>Download JSON</button>
+              )}
+            </div>
           </div>
         )}
 
         {tab === "pdf" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              Bank format (optional hint)
-              <select value={pdfBank} onChange={(e) => setPdfBank(e.target.value)}>
-                <option value="generic">Auto-detect</option>
-                <option value="hdfc">HDFC</option>
-                <option value="sbi">SBI</option>
-                <option value="icici">ICICI</option>
-                <option value="axis">Axis</option>
-              </select>
-            </label>
-            <label>
-              Max pages to scan
-              <input
-                type="number"
-                min={1}
-                max={100}
-                value={pdfMaxPages}
-                onChange={(e) => setPdfMaxPages(Number(e.target.value) || 1)}
-              />
-            </label>
-            <label>
-              PDF statement
-              <input id="pdf-file-input" type="file" accept="application/pdf" />
-            </label>
-            {pdfFileName && (
-              <div style={{ color: "#555", fontSize: 13 }}>
-                Selected: <strong>{pdfFileName}</strong>
-              </div>
-            )}
-            {pdfAnalyzing && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>
-                  Analyzing statement… this can take a few seconds for large PDFs.
-                </div>
-                <div
-                  style={{
-                    height: 8,
-                    borderRadius: 4,
-                    background: "#e5e7eb",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${Math.min(100, pdfProgress)}%`,
-                      background: "#6366F1",
-                      transition: "width 0.3s ease-out",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {tab === "pdf" && (
-          <div style={{ display: "grid", gap: 10 }}>
-            <label>
-              Bank (parsing hint)
-              <select value={pdfBank} onChange={(e) => setPdfBank(e.target.value)}>
+          <div className="finsight-form-panel">
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Bank (parsing hint)</span>
+              <select className="finsight-input" value={pdfBank} onChange={(e) => setPdfBank(e.target.value)}>
                 <option value="generic">Generic</option>
                 <option value="hdfc">HDFC</option>
                 <option value="sbi">SBI</option>
                 <option value="icici">ICICI</option>
                 <option value="axis">Axis</option>
               </select>
-            </label>
-            <label>
-              Max pages to read (faster for large PDFs)
-              <input
-                type="number"
-                min={1}
-                max={200}
-                value={pdfMaxPages}
-                onChange={(e) => setPdfMaxPages(Number(e.target.value))}
-              />
-            </label>
-            <input
-              id="pdf-file-input"
-              type="file"
-              accept=".pdf,application/pdf"
-              onChange={(e) => handlePdfFile(e.target.files?.[0])}
-            />
-            {pdfFileName && (
-              <div style={{ color: "#555", fontSize: 13 }}>
-                Selected: <strong>{pdfFileName}</strong>
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">Max pages to read</span>
+              <input className="finsight-input" type="number" min={1} max={200} value={pdfMaxPages} onChange={(e) => setPdfMaxPages(Number(e.target.value))} />
+            </div>
+            <div className="finsight-form-row">
+              <span className="finsight-form-label">PDF statement</span>
+              <input id="pdf-file-input" type="file" accept=".pdf,application/pdf" onChange={(e) => handlePdfFile(e.target.files?.[0])} style={{ fontSize: "12px", color: "var(--finsight-muted)" }} />
+              {pdfFileName && <span style={{ fontSize: "12px", color: "var(--finsight-muted)", marginTop: "4px" }}>Selected: <strong style={{ color: "var(--finsight-text)" }}>{pdfFileName}</strong></span>}
+            </div>
+            {pdfAnalyzing && (
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "12px", color: "var(--finsight-muted)", marginBottom: "6px" }}>Analyzing… this can take a few seconds.</div>
+                <div style={{ height: "8px", borderRadius: "4px", background: "var(--finsight-surface2)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, pdfProgress)}%`, background: "var(--finsight-accent)", transition: "width 0.3s ease-out" }} />
+                </div>
               </div>
             )}
-            <div style={{ color: "#555", fontSize: 13 }}>
-              Note: scanned/image PDFs may need OCR (not added yet).
+            <p style={{ fontSize: "11px", color: "var(--finsight-muted)", marginTop: "8px" }}>Note: scanned/image PDFs may need OCR (not added yet).</p>
+            <div className="finsight-form-actions">
+              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
+              {(result || pdfResponse) && (
+                <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(pdfResponse, null, 2))}>Download JSON</button>
+              )}
+              {(tab === "batch" || tab === "pdf") && filteredResults.length > 0 && (
+                <button type="button" className="finsight-btn" onClick={() => downloadText(`filtered_${tab}_${Date.now()}.csv`, toCsv(filteredResults), "text/csv")}>Download CSV (filtered)</button>
+              )}
             </div>
           </div>
         )}
+      </div>
 
-        {error && <div style={{ color: "crimson" }}>{error}</div>}
-
-        <div>
-          <button onClick={handleSubmit} disabled={!canSubmit}>
-            {isLoading ? "Processing..." : "Run categorization"}
-          </button>
-          {(result || pdfResponse) && (
-            <button
-              type="button"
-              style={{ marginLeft: 8 }}
-              onClick={() =>
-                downloadText(
-                  `categorization_${tab}_${Date.now()}.json`,
-                  JSON.stringify(tab === "pdf" ? pdfResponse : result, null, 2)
-                )
-              }
-            >
-              Download JSON
-            </button>
-          )}
-          {(tab === "batch" || tab === "pdf") && filteredResults.length > 0 && (
-            <button
-              type="button"
-              style={{ marginLeft: 8 }}
-              onClick={() =>
-                downloadText(
-                  `filtered_${tab}_${Date.now()}.csv`,
-                  toCsv(filteredResults),
-                  "text/csv"
-                )
-              }
-            >
-              Download CSV (filtered)
-            </button>
-          )}
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
 
         {processedSingle && (
           <div style={{ marginTop: 12, border: "1px solid #eee", padding: 12 }}>
@@ -1137,7 +1028,7 @@ export default function Categorize() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

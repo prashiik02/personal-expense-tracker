@@ -18,12 +18,12 @@ export default function TaxSuggestions() {
   }
 
   return (
-    <div style={{ border: "1px solid #eee", padding: 12, borderRadius: 6, marginTop: 12 }}>
-      <h3>Tax Saving Suggestions</h3>
-      <button onClick={fetch} disabled={loading}>{loading ? "Thinking…" : "Get Suggestions"}</button>
+    <div>
+      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Tax Saving Suggestions</div>
+      <button type="button" className="finsight-btn finsight-btn-primary" onClick={fetch} disabled={loading}>{loading ? "Thinking…" : "Get Suggestions"}</button>
       {suggestions && (
-        <div style={{ marginTop: 12 }}>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{typeof suggestions === 'string' ? suggestions : JSON.stringify(suggestions, null, 2)}</pre>
+        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)" }}>
+          {typeof suggestions === "string" ? suggestions : JSON.stringify(suggestions, null, 2)}
         </div>
       )}
     </div>

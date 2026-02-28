@@ -3,6 +3,11 @@ from typing import Optional
 
 from groq import Groq
 
+try:
+    from groq import RateLimitError, AuthenticationError, APIError
+except ImportError:
+    RateLimitError = AuthenticationError = APIError = None  # older SDK
+
 # simple shared wrapper for talking to the Groq LLM; the existing
 # statements/llm_fallback module has its own private _get_client(), but
 # the new conversational and report features all need to invoke the model
@@ -42,10 +47,28 @@ def ask(prompt: str, *, temperature: float = 0.1, max_tokens: int = 512) -> str:
         raise RuntimeError("GROQ_API_KEY is not set")
 
     model_name = os.getenv("GROQ_MODEL") or "llama-3.3-70b-versatile"
-    resp = client.chat.completions.create(
-        model=model_name,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    return (resp.choices[0].message.content or "").strip()
+    try:
+        resp = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        if RateLimitError is not None and isinstance(e, RateLimitError):
+            raise RuntimeError(
+                "AI rate limit reached for today. Please try again in a few minutes, "
+                "or check your Groq account limits at https://console.groq.com/settings/billing"
+            ) from e
+        if AuthenticationError is not None and isinstance(e, AuthenticationError):
+            raise RuntimeError(
+                "Invalid or expired Groq API key. Check GROQ_API_KEY in your .env file and https://console.groq.com"
+            ) from e
+        if getattr(e, "status_code", None) == 429:
+            raise RuntimeError("AI rate limit reached. Please try again in a few minutes.") from e
+        if getattr(e, "status_code", None) == 401:
+            raise RuntimeError("Invalid Groq API key. Check GROQ_API_KEY in .env") from e
+        if APIError is not None and isinstance(e, APIError):
+            raise RuntimeError(f"Groq API error: {getattr(e, 'message', str(e))}") from e
+        raise

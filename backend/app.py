@@ -19,10 +19,13 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Allow frontend on Vite dev server (127.0.0.1:5173) to call this API
+    # Allow frontend (e.g. localhost:5173) to call this API with Authorization header
     CORS(
         app,
-        resources={r"/*": {"origins": "*"}},
+        resources={r"/*": {
+            "origins": "*",
+            "allow_headers": ["Content-Type", "Authorization"],
+        }},
         supports_credentials=True,
     )
 

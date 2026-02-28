@@ -13,35 +13,36 @@ export default function ChatAssistant() {
       const res = await askAssistant(question);
       setAnswer(res.answer || res);
     } catch (e) {
-      setAnswer({ error: e.message || String(e) });
+      const msg = e.response?.data?.error || e.message || String(e);
+      setAnswer({ error: msg });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div style={{ border: "1px solid #eee", padding: 12, borderRadius: 6 }}>
-      <h3>Assistant Chat</h3>
+    <div>
+      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Assistant Chat</div>
       <textarea
+        className="finsight-input"
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
         rows={4}
-        style={{ width: "100%", marginBottom: 8 }}
+        style={{ width: "100%", marginBottom: "12px", resize: "vertical" }}
         placeholder="Ask about your spending, budgets, or taxes"
       />
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={send} disabled={loading}>
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button type="button" className="finsight-btn finsight-btn-primary" onClick={send} disabled={loading}>
           {loading ? "Thinking…" : "Ask"}
         </button>
-        <button onClick={() => { setQuestion(""); setAnswer(null); }}>
+        <button type="button" className="finsight-btn" onClick={() => { setQuestion(""); setAnswer(null); }}>
           Clear
         </button>
       </div>
 
       {answer && (
-        <div style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>
-          <strong>Answer:</strong>
-          <div style={{ marginTop: 8 }}>{typeof answer === "string" ? answer : JSON.stringify(answer, null, 2)}</div>
+        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)" }}>
+          {typeof answer === "string" ? answer : (answer.error ? String(answer.error) : JSON.stringify(answer, null, 2))}
         </div>
       )}
     </div>

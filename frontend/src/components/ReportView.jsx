@@ -19,17 +19,16 @@ export default function ReportView() {
   }
 
   return (
-    <div style={{ border: "1px solid #eee", padding: 12, borderRadius: 6 }}>
-      <h3>Monthly Health Report</h3>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <input placeholder="YYYY-MM (optional)" value={month} onChange={(e) => setMonth(e.target.value)} />
-        <button onClick={fetchReport} disabled={loading}>{loading ? "Loading…" : "Generate"}</button>
+    <div>
+      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Monthly Health Report</div>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
+        <input className="finsight-input" placeholder="YYYY-MM (optional)" value={month} onChange={(e) => setMonth(e.target.value)} style={{ flex: "1", minWidth: 140 }} />
+        <button type="button" className="finsight-btn finsight-btn-primary" onClick={fetchReport} disabled={loading}>{loading ? "Loading…" : "Generate"}</button>
       </div>
 
       {report && (
-        <div>
-          <h4>Report</h4>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{report.report || JSON.stringify(report.data, null, 2)}</pre>
+        <div style={{ padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)" }}>
+          {report.report || JSON.stringify(report.data, null, 2)}
         </div>
       )}
     </div>

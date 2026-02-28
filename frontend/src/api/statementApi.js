@@ -18,3 +18,20 @@ export const fetchDashboardOverview = async () => {
   return res.data;
 };
 
+export const fetchTransactions = async ({ category, subcategory, month, limit = 100 } = {}) => {
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  if (subcategory) params.set("subcategory", subcategory);
+  if (month) params.set("month", month);
+  if (limit) params.set("limit", String(limit));
+  const res = await API.get(`/statements/transactions?${params.toString()}`);
+  return res.data;
+};
+
+export const excludeTransactionFromAnalysis = async (txnId) => {
+  const res = await API.patch(`/statements/transactions/${txnId}`, {
+    exclude_from_analytics: true,
+  });
+  return res.data;
+};
+

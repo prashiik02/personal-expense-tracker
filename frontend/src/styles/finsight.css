@@ -1,0 +1,426 @@
+/* FinSight theme — applied across all pages */
+:root {
+  --finsight-bg: #0a0a0f;
+  --finsight-surface: #12121a;
+  --finsight-surface2: #1a1a26;
+  --finsight-border: #2a2a3e;
+  --finsight-accent: #7c6af7;
+  --finsight-accent2: #f7706a;
+  --finsight-accent3: #4ad8a0;
+  --finsight-accent4: #f7c26a;
+  --finsight-text: #e8e8f0;
+  --finsight-muted: #6b6b8a;
+  --finsight-danger: #f7706a;
+  --finsight-success: #4ad8a0;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body.finsight {
+  font-family: 'DM Mono', monospace;
+  background: var(--finsight-bg);
+  color: var(--finsight-text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body.finsight::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(124,106,247,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,106,247,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.finsight-app {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* Header */
+.finsight-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 40px;
+  animation: finsightFadeUp 0.6s ease both;
+}
+
+.finsight-logo {
+  font-family: 'Syne', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.finsight-logo span { color: var(--finsight-accent); }
+
+.finsight-header-meta {
+  text-align: right;
+  font-size: 11px;
+  color: var(--finsight-muted);
+  line-height: 1.8;
+}
+
+.finsight-period-badge {
+  display: inline-block;
+  background: var(--finsight-surface2);
+  border: 1px solid var(--finsight-border);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--finsight-accent);
+  margin-top: 6px;
+}
+
+/* Alert banner */
+.finsight-alert-banner {
+  background: linear-gradient(135deg, rgba(247,112,106,0.12), rgba(247,112,106,0.04));
+  border: 1px solid rgba(247,112,106,0.3);
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  animation: finsightFadeUp 0.6s 0.1s ease both;
+}
+
+.finsight-alert-icon { font-size: 18px; }
+.finsight-alert-text { color: var(--finsight-text); }
+.finsight-alert-text strong { color: var(--finsight-accent2); }
+
+.finsight-alert-banner.surplus {
+  background: linear-gradient(135deg, rgba(74,216,160,0.12), rgba(74,216,160,0.04));
+  border-color: rgba(74,216,160,0.35);
+}
+.finsight-alert-banner.surplus .finsight-alert-text strong { color: var(--finsight-success); }
+.finsight-alert-banner.deficit .finsight-alert-text strong { color: var(--finsight-danger); }
+
+/* KPI grid */
+.finsight-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 768px) {
+  .finsight-kpi-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.finsight-kpi-card {
+  background: var(--finsight-surface);
+  border: 1px solid var(--finsight-border);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  animation: finsightFadeUp 0.6s ease both;
+}
+
+.finsight-kpi-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 0 0 16px 16px;
+}
+
+.finsight-kpi-card.income::after { background: var(--finsight-accent3); }
+.finsight-kpi-card.spend::after { background: var(--finsight-accent2); }
+.finsight-kpi-card.net::after { background: var(--finsight-accent); }
+.finsight-kpi-card.txn::after { background: var(--finsight-accent4); }
+
+.finsight-kpi-label {
+  font-size: 10px;
+  color: var(--finsight-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+}
+
+.finsight-kpi-value {
+  font-family: 'Syne', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.finsight-kpi-card.income .finsight-kpi-value { color: var(--finsight-accent3); }
+.finsight-kpi-card.spend .finsight-kpi-value { color: var(--finsight-accent2); }
+.finsight-kpi-card.net .finsight-kpi-value { color: var(--finsight-danger); }
+.finsight-kpi-card.net.surplus .finsight-kpi-value { color: var(--finsight-success); }
+.finsight-kpi-card.net.surplus::after { background: var(--finsight-success); }
+.finsight-kpi-card.txn .finsight-kpi-value { color: var(--finsight-accent4); }
+
+.finsight-kpi-sub { font-size: 11px; color: var(--finsight-muted); }
+
+/* Cards */
+.finsight-card {
+  background: var(--finsight-surface);
+  border: 1px solid var(--finsight-border);
+  border-radius: 16px;
+  padding: 24px;
+  animation: finsightFadeUp 0.6s 0.3s ease both;
+}
+
+.finsight-card-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--finsight-muted);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.finsight-card-title::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--finsight-accent);
+  display: inline-block;
+}
+
+/* Main grid */
+.finsight-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .finsight-main-grid { grid-template-columns: 1fr; }
+}
+
+/* Category bars */
+.finsight-category-list { display: flex; flex-direction: column; gap: 14px; }
+
+.finsight-cat-item { display: flex; flex-direction: column; gap: 6px; }
+
+.finsight-cat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.finsight-cat-name { color: var(--finsight-text); }
+.finsight-cat-amount {
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.finsight-cat-meta { font-size: 10px; color: var(--finsight-muted); }
+
+.finsight-bar-track {
+  height: 6px;
+  background: var(--finsight-surface2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.finsight-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 1s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Chart cards & wrappers */
+.finsight-chart-card { overflow: hidden; }
+.finsight-chart-empty {
+  font-size: 12px;
+  color: var(--finsight-muted);
+  padding: 24px 0;
+  text-align: center;
+}
+.finsight-bar-chart-wrap { min-height: 180px; }
+.finsight-donut-wrap { position: relative; }
+.finsight-donut-total {
+  text-align: center;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--finsight-border);
+  margin-top: 8px;
+}
+.finsight-donut-total-label {
+  display: block;
+  font-size: 10px;
+  color: var(--finsight-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.finsight-donut-total-value {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--finsight-accent);
+}
+.finsight-line-chart-wrap { min-height: 200px; }
+
+/* Merchants */
+.finsight-merchant-list { display: flex; flex-direction: column; gap: 10px; }
+
+.finsight-merchant-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--finsight-surface2);
+  border-radius: 10px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.finsight-merchant-row:hover { border-color: var(--finsight-border); }
+
+.finsight-merchant-rank {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--finsight-muted);
+  width: 24px;
+}
+
+.finsight-merchant-name { flex: 1; color: var(--finsight-text); }
+.finsight-merchant-count { color: var(--finsight-muted); font-size: 10px; }
+.finsight-merchant-amount {
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--finsight-accent2);
+}
+
+/* Buttons */
+.finsight-btn {
+  background: var(--finsight-surface2);
+  border: 1px solid var(--finsight-border);
+  color: var(--finsight-text);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.finsight-btn:hover {
+  border-color: var(--finsight-accent);
+  color: var(--finsight-accent);
+}
+
+.finsight-btn-primary {
+  background: var(--finsight-accent);
+  border-color: var(--finsight-accent);
+  color: white;
+}
+
+.finsight-btn-primary:hover {
+  opacity: 0.9;
+  color: white;
+}
+
+/* Form inputs (auth pages) */
+.finsight-input {
+  width: 100%;
+  background: var(--finsight-surface2);
+  border: 1px solid var(--finsight-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--finsight-text);
+}
+
+.finsight-input::placeholder { color: var(--finsight-muted); }
+.finsight-input:focus {
+  outline: none;
+  border-color: var(--finsight-accent);
+}
+
+textarea.finsight-input {
+  min-height: 80px;
+  resize: vertical;
+}
+
+select.finsight-input {
+  cursor: pointer;
+}
+
+/* Form row (label + input) */
+.finsight-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.finsight-form-row:last-of-type { margin-bottom: 0; }
+
+.finsight-form-label {
+  font-size: 11px;
+  color: var(--finsight-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.finsight-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--finsight-border);
+}
+
+.finsight-form-panel {
+  padding: 24px 0 0;
+  border-top: 1px solid var(--finsight-border);
+  margin-top: 20px;
+}
+
+/* Nav link */
+.finsight-nav-link {
+  color: var(--finsight-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.finsight-nav-link:hover,
+.finsight-nav-link.active {
+  color: var(--finsight-accent);
+  background: rgba(124,106,247,0.1);
+}
+
+.finsight-auth-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 0px);
+  padding: 24px;
+}
+
+@keyframes finsightFadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

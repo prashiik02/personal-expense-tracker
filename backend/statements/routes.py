@@ -9,7 +9,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from categorization.pipeline_service import get_pipeline
 from smart_categorization.core.pipeline import Transaction
 
-from .analysis import compute_time_aggregates, compute_top_merchants
+from .analysis import compute_time_aggregates, compute_top_merchants, UNCATEGORIZED_CATEGORY
 from .parse_lines import (
     parse_statement_text,
     ParsedTxn,
@@ -21,6 +21,7 @@ from .pdf_extract import extract_text, extract_tables
 from .llm_fallback import parse_bank_statement_with_llm
 from models import db
 from models.transaction_model import TransactionRecord
+from models.user_model import User
 
 
 statements_bp = Blueprint("statements", __name__, url_prefix="/statements")
@@ -278,6 +279,9 @@ def dashboard_overview():
     time_aggs = compute_time_aggregates(processed_like)
     top_merchants = compute_top_merchants(processed_like, limit=12)
 
+    user = User.query.get(user_id)
+    monthly_income = float(user.monthly_income or 0) if user else 0
+
     categories = sorted({r["category"] for r in processed_like if r.get("category")})
     subcategories = sorted(
         {
@@ -292,6 +296,7 @@ def dashboard_overview():
     return jsonify(
         {
             "transactions_count": len(processed_like),
+            "monthly_income": monthly_income if monthly_income > 0 else None,
             "time_aggregates": time_aggs,
             "top_merchants": top_merchants,
             "filters": {
@@ -302,4 +307,80 @@ def dashboard_overview():
             },
         }
     ), 200
+
+
+@statements_bp.route("/transactions", methods=["GET"])
+@jwt_required()
+def list_transactions():
+    """
+    List stored transactions for the current user.
+    Query params: category (e.g. "Shopping"), subcategory (e.g. "Electronics"),
+    month (YYYY-MM), limit (default 100, max 500).
+    """
+    user_id = int(get_jwt_identity())
+    category = request.args.get("category", "").strip() or None
+    subcategory = request.args.get("subcategory", "").strip() or None
+    month = request.args.get("month", "").strip() or None
+    try:
+        limit = min(500, max(1, int(request.args.get("limit", 100))))
+    except ValueError:
+        limit = 100
+
+    q = TransactionRecord.query.filter_by(user_id=user_id)
+    if category:
+        q = q.filter(TransactionRecord.category == category)
+    if subcategory:
+        q = q.filter(TransactionRecord.subcategory == subcategory)
+    if month and len(month) >= 7:
+        q = q.filter(TransactionRecord.date.startswith(month))  # type: ignore[attr-defined]
+    records = q.order_by(TransactionRecord.date.desc(), TransactionRecord.id.desc()).limit(limit).all()
+
+    out = []
+    for r in records:
+        try:
+            tags = json.loads(r.tags_json) if r.tags_json else []
+        except Exception:
+            tags = []
+        out.append({
+            "id": r.id,
+            "transaction_id": r.external_id or str(r.id),
+            "date": r.date,
+            "description": r.description,
+            "amount": float(r.amount or 0.0),
+            "currency": r.currency,
+            "category": r.category,
+            "subcategory": r.subcategory,
+            "merchant_name": r.merchant_name,
+        })
+    return jsonify({"transactions": out}), 200
+
+
+@statements_bp.route("/transactions/<int:txn_id>", methods=["PATCH"])
+@jwt_required()
+def update_transaction(txn_id):
+    """
+    Update a transaction's category (e.g. move to Uncategorized to exclude from analysis).
+    Body: { "category": "Uncategorized", "subcategory": "Uncategorized" }
+    or { "exclude_from_analytics": true } as shorthand.
+    """
+    user_id = int(get_jwt_identity())
+    record = TransactionRecord.query.filter_by(id=txn_id, user_id=user_id).first()
+    if not record:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    data = request.get_json() or {}
+    if data.get("exclude_from_analytics") is True:
+        record.category = UNCATEGORIZED_CATEGORY
+        record.subcategory = UNCATEGORIZED_CATEGORY
+    else:
+        if "category" in data and data["category"] is not None:
+            record.category = str(data["category"]).strip() or UNCATEGORIZED_CATEGORY
+        if "subcategory" in data and data["subcategory"] is not None:
+            record.subcategory = str(data["subcategory"]).strip() or UNCATEGORIZED_CATEGORY
+    db.session.commit()
+    return jsonify({
+        "id": record.id,
+        "category": record.category,
+        "subcategory": record.subcategory,
+    }), 200
 

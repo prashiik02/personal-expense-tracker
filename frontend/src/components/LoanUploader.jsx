@@ -20,17 +20,16 @@ export default function LoanUploader() {
   }
 
   return (
-    <div style={{ border: "1px solid #eee", padding: 12, borderRadius: 6, marginTop: 12 }}>
-      <h3>Loan Document Analyzer</h3>
-      <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-      <div style={{ marginTop: 8 }}>
-        <button onClick={submit} disabled={loading || !file}>{loading ? "Uploading…" : "Upload & Analyze"}</button>
+    <div>
+      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Loan Document Analyzer</div>
+      <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} style={{ fontSize: "12px", color: "var(--finsight-muted)" }} />
+      <div style={{ marginTop: "12px" }}>
+        <button type="button" className="finsight-btn finsight-btn-primary" onClick={submit} disabled={loading || !file}>{loading ? "Uploading…" : "Upload & Analyze"}</button>
       </div>
 
       {result && (
-        <div style={{ marginTop: 12 }}>
-          <h4>Parsed Result</h4>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result, null, 2)}</pre>
+        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)" }}>
+          {JSON.stringify(result, null, 2)}
         </div>
       )}
     </div>

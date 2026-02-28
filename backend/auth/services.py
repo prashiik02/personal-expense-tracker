@@ -16,7 +16,7 @@ def register_user(data):
         name=data.name,
         email=data.email,
         password=generate_password_hash(data.password),
-        monthly_income=data.monthly_income
+        monthly_income=data.monthly_income,
     )
 
     db.session.add(user)

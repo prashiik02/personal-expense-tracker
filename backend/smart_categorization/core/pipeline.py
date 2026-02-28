@@ -289,8 +289,21 @@ class SmartCategorizationPipeline:
         print(f"Custom category '{name}' created with {len(rules)} rules")
         return cat
     
+    # Categories excluded from analytics (P2P, user-marked uncategorized).
+    _EXCLUDED_ANALYTICS_CATEGORIES = ("Transfers & Payments", "Uncategorized")
+    _EXCLUDED_ANALYTICS_CAT_SUB = (("Shopping", "Electronics"),)
+
+    def _excluded_from_analytics(self, r: ProcessedTransaction) -> bool:
+        cat = (r.category or "").strip()
+        sub = (r.subcategory or "").strip()
+        if cat in self._EXCLUDED_ANALYTICS_CATEGORIES:
+            return True
+        if (cat, sub) in self._EXCLUDED_ANALYTICS_CAT_SUB:
+            return True
+        return False
+
     def get_summary(self, results: List[ProcessedTransaction]) -> dict:
-        """Generate category summary from processed transactions."""
+        """Generate category summary from processed transactions (excludes P2P, Uncategorized, Shopping>Electronics)."""
         from collections import defaultdict
         
         summary = defaultdict(lambda: {"total": 0, "count": 0, "transactions": []})
@@ -298,6 +311,8 @@ class SmartCategorizationPipeline:
         needs_review = []
         
         for r in results:
+            if self._excluded_from_analytics(r):
+                continue
             key = f"{r.category} > {r.subcategory}"
             summary[key]["total"] += abs(r.amount)
             summary[key]["count"] += 1
@@ -311,9 +326,10 @@ class SmartCategorizationPipeline:
             if r.needs_review:
                 needs_review.append(r.transaction_id)
         
+        non_excluded = [r for r in results if not self._excluded_from_analytics(r)]
         return {
-            "total_transactions": len(results),
-            "total_spend": sum(abs(r.amount) for r in results if r.amount > 0),
+            "total_transactions": len(non_excluded),
+            "total_spend": sum(abs(r.amount) for r in non_excluded if r.amount > 0),
             "categories": dict(summary),
             "subscriptions": subscriptions,
             "needs_review_count": len(needs_review),
