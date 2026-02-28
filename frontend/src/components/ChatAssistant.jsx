@@ -41,8 +41,16 @@ export default function ChatAssistant() {
       </div>
 
       {answer && (
-        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)" }}>
-          {typeof answer === "string" ? answer : (answer.error ? String(answer.error) : JSON.stringify(answer, null, 2))}
+        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", border: "1px solid var(--finsight-border)", lineHeight: 1.5 }}>
+          {typeof answer === "string" ? (
+            <div style={{ whiteSpace: "pre-wrap" }}>{answer}</div>
+          ) : answer.error ? (
+            <div style={{ color: "var(--finsight-danger)" }}>{String(answer.error)}</div>
+          ) : answer.answer ? (
+            <div style={{ whiteSpace: "pre-wrap" }}>{answer.answer}</div>
+          ) : (
+            <div style={{ whiteSpace: "pre-wrap" }}>{String(answer)}</div>
+          )}
         </div>
       )}
     </div>

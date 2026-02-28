@@ -5,6 +5,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from pydantic import ValidationError
 
 from smart_categorization.core.pipeline import Transaction
+from llm_providers import categorize_batch_via_llm_chunked, get_chunked_provider, chunked_llm_available
 from models import db
 from models.transaction_model import TransactionRecord
 
@@ -83,16 +84,56 @@ def categorize_batch():
 
     pipeline = get_pipeline()
     processed = []
-    for t in txns:
-        txn = Transaction(
-            transaction_id=t.transaction_id or "txn",
-            date=t.date,
-            description=t.description,
-            amount=t.amount,
-            currency=t.currency,
-            line_items=[li.model_dump() for li in (t.line_items or [])] or None,
-        )
-        processed.append(pipeline.process(txn))
+
+    use_chunked = getattr(data, "use_llm_chunked", False)
+    try:
+        has_llm = chunked_llm_available()
+        provider = get_chunked_provider() if has_llm else None
+    except Exception:
+        has_llm = False
+        provider = None
+
+    if use_chunked and has_llm and len(txns) > 0:
+        # Split data, categorize each chunk via Gemini/DeepSeek, merge and run enrichment.
+        txn_dicts = [
+            {
+                "transaction_id": t.transaction_id or "txn",
+                "description": t.description,
+                "amount": t.amount,
+            }
+            for t in txns
+        ]
+        chunked_results = categorize_batch_via_llm_chunked(txn_dicts)
+        method = "gemini_chunked" if provider == "gemini" else "deepseek_chunked"
+        for t, res in zip(txns, chunked_results):
+            txn = Transaction(
+                transaction_id=t.transaction_id or "txn",
+                date=t.date,
+                description=t.description,
+                amount=t.amount,
+                currency=t.currency,
+                line_items=[li.model_dump() for li in (t.line_items or [])] or None,
+            )
+            processed.append(
+                pipeline.process_with_category(
+                    txn,
+                    category=res["category"],
+                    subcategory=res["subcategory"],
+                    confidence=res["confidence"],
+                    method=method,
+                )
+            )
+    else:
+        for t in txns:
+            txn = Transaction(
+                transaction_id=t.transaction_id or "txn",
+                date=t.date,
+                description=t.description,
+                amount=t.amount,
+                currency=t.currency,
+                line_items=[li.model_dump() for li in (t.line_items or [])] or None,
+            )
+            processed.append(pipeline.process(txn, enable_llm_fallback=False))
 
     processed_dicts = [p.to_dict() for p in processed]
 

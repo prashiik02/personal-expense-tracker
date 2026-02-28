@@ -181,6 +181,7 @@ export default function Categorize() {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [batchMode, setBatchMode] = useState("file"); // file | text
+  const [useLlmChunked, setUseLlmChunked] = useState(false);
   const [csvFileName, setCsvFileName] = useState("");
   const [pdfFileName, setPdfFileName] = useState("");
   const [pdfBank, setPdfBank] = useState("generic");
@@ -332,6 +333,7 @@ export default function Categorize() {
           csv_text: csvText,
           include_summary: true,
           return_results: true,
+          use_llm_chunked: useLlmChunked,
         });
         setResult(data);
         return;
@@ -542,6 +544,10 @@ export default function Categorize() {
                 <textarea className="finsight-input" rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder={"transaction_id,date,description,amount\nA1,2024-01-15,BUNDL UPI,320"} />
               </div>
             )}
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px", fontSize: "12px", color: "var(--finsight-text)" }}>
+              <input type="checkbox" checked={useLlmChunked} onChange={(e) => setUseLlmChunked(e.target.checked)} />
+              Use AI (Gemini/DeepSeek) — split batch into chunks for better accuracy (requires API key in backend)
+            </label>
             <details style={{ marginTop: "12px" }}>
               <summary style={{ cursor: "pointer", fontSize: "12px", color: "var(--finsight-muted)" }}>Preview (first 15 lines)</summary>
               <pre style={{ background: "var(--finsight-surface2)", padding: "12px", overflowX: "auto", fontSize: "11px", marginTop: "8px", borderRadius: "8px", border: "1px solid var(--finsight-border)" }}>
@@ -687,12 +693,33 @@ export default function Categorize() {
                   )}
                 </div>
               </div>
-              {processedSingle.is_split && (
+              {processedSingle.is_split && Array.isArray(processedSingle.split_items) && processedSingle.split_items.length > 0 && (
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Split items</div>
-                  <pre style={{ background: "var(--finsight-surface2)", border: "1px solid var(--finsight-border)", borderRadius: 10, padding: 12, overflowX: "auto" }}>
-                    {JSON.stringify(processedSingle.split_items, null, 2)}
-                  </pre>
+                  <div style={{ color: "var(--finsight-muted)", fontSize: 12, marginBottom: 8 }}>Split items</div>
+                  <div style={{ overflowX: "auto", border: "1px solid var(--finsight-border)", borderRadius: 10, background: "var(--finsight-surface2)" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--finsight-border)", textAlign: "left" }}>
+                          <th style={{ padding: "8px 12px" }}>Description</th>
+                          <th style={{ padding: "8px 12px" }}>Amount</th>
+                          <th style={{ padding: "8px 12px" }}>Category</th>
+                          <th style={{ padding: "8px 12px" }}>Subcategory</th>
+                          <th style={{ padding: "8px 12px" }}>%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {processedSingle.split_items.map((item, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid var(--finsight-border)" }}>
+                            <td style={{ padding: "8px 12px" }}>{item.description ?? item.name ?? "—"}</td>
+                            <td style={{ padding: "8px 12px", fontWeight: 600 }}>₹{formatINR(Number(item.amount ?? item.value ?? 0))}</td>
+                            <td style={{ padding: "8px 12px" }}>{item.category ?? "—"}</td>
+                            <td style={{ padding: "8px 12px" }}>{item.subcategory ?? "—"}</td>
+                            <td style={{ padding: "8px 12px", color: "var(--finsight-muted)" }}>{item.percentage != null ? `${Number(item.percentage).toFixed(1)}%` : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -951,21 +978,6 @@ export default function Categorize() {
               </div>
             </details>
 
-            <details style={{ marginTop: 12 }}>
-              <summary style={{ cursor: "pointer" }}>Results (JSON)</summary>
-              <pre style={{ background: "var(--finsight-surface2)", border: "1px solid var(--finsight-border)", borderRadius: 10, padding: 12, overflowX: "auto" }}>
-                {JSON.stringify(tab === "pdf" ? pdfResponse : result, null, 2)}
-              </pre>
-            </details>
-          </div>
-        )}
-
-        {result && (
-          <div style={{ marginTop: 12 }}>
-            <h3 style={{ marginBottom: 8 }}>Result</h3>
-            <pre style={{ background: "var(--finsight-surface2)", border: "1px solid var(--finsight-border)", borderRadius: 10, padding: 12, overflowX: "auto" }}>
-              {JSON.stringify(result, null, 2)}
-            </pre>
           </div>
         )}
       </div>

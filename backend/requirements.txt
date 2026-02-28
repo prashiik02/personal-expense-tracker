@@ -11,4 +11,5 @@ numpy
 scikit-learn==1.5.2
 pypdf
 pdfplumber
-groq
+openai
+google-generativeai

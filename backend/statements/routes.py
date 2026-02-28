@@ -18,7 +18,7 @@ from .parse_lines import (
     _is_valid_description,
 )
 from .pdf_extract import extract_text, extract_tables
-from .llm_fallback import parse_bank_statement_with_llm
+from .llm_fallback import parse_bank_statement_with_llm, parse_bank_statement_with_llm_chunked
 from models import db
 from models.transaction_model import TransactionRecord
 from models.user_model import User
@@ -91,10 +91,13 @@ def analyze_pdf_statement():
         if not parsed:
             parsed = parse_statement_text(text, bank=bank, currency=currency)
 
-        # 3) If that fails (or found very few rows), try Groq LLM parser.
+        # 3) If that fails (or found very few rows), try LLM parser (chunked when text is long).
         # Regex can partially match header/noise; LLM often extracts more from varied formats.
         if not parsed or (len(parsed) < 3 and len(text.strip()) > 500):
-            llm_txns = parse_bank_statement_with_llm(text)
+            if len(text.strip()) > 40_000:
+                llm_txns = parse_bank_statement_with_llm_chunked(text)
+            else:
+                llm_txns = parse_bank_statement_with_llm(text)
             llm_parsed = []
             for idx, t in enumerate(llm_txns, start=1):
                 try:
@@ -172,8 +175,11 @@ def analyze_pdf_statement():
                 amount=p.amount,
                 currency=p.currency,
             )
-            # PDF transactions: use Groq LLM only (skip ML model)
-            processed_objs.append(pipeline.process(txn, use_llm_only=True))
+            # Use merchant DB + ML only (no per-row LLM) so PDF analyze stays fast.
+            # Optional LLM was already used above for parsing when regex found few rows.
+            processed_objs.append(
+                pipeline.process(txn, use_llm_only=False, enable_llm_fallback=False)
+            )
 
         processed = [o.to_dict() for o in processed_objs]
 

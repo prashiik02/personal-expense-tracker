@@ -84,42 +84,29 @@ The demo notebook lives at `backend/smart_categorization/Smart_Categorization_In
 
 ---
 
-## 🤖 Ollama LLM categorization (recommended)
+## 🤖 LLM categorization with DeepSeek (recommended)
 
-If you want smarter categorization than the built-in ML model, you can enable a **local Ollama LLM**.
-The app will keep using Merchant DB + rules first, and will call Ollama **only when the ML confidence is low**.
+If you want smarter categorization than the built-in ML model, you can enable the **DeepSeek LLM**.
+The app will keep using Merchant DB + rules first, and will call the LLM **only when the ML confidence is low**.
 
-### 1) Install Ollama
+### 1) Get a DeepSeek API key
 
-- Download and install Ollama from `https://ollama.com/` (Windows/Mac/Linux).
+- Sign up and create an API key from the DeepSeek console.
 
-### 2) Pull a model
-
-In a terminal:
-
-```bash
-ollama pull llama3.1:8b
-```
-
-You can use other models too (e.g. `mistral`, `qwen2.5`, etc.) — just update `OLLAMA_MODEL`.
-
-### 3) Start Ollama
-
-Ollama typically runs automatically as a background service.
-To verify it’s running, open:
-
-- `http://127.0.0.1:11434`
-
-### 4) Enable it in the backend `.env`
+### 2) Configure the backend `.env`
 
 In `backend/.env`:
 
 ```env
 OLLAMA_ENABLED=true
-OLLAMA_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=llama3.1:8b
+OLLAMA_URL=http://127.0.0.1:11434  # kept for backwards-compatibility; not used by DeepSeek
 OLLAMA_TIMEOUT_S=20
 OLLAMA_MIN_CONFIDENCE=0.62
+
+# DeepSeek – do NOT commit real keys
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
 
 ### 5) Restart the backend
@@ -132,7 +119,7 @@ python app.py
 Now uploads (PDF/CSV/SMS) and categorization requests will automatically use the LLM fallback when needed.
 
 ## 🧠 Conversational Financial Assistant
-Send a POST to `/assistant/query` with a JSON body `{ "question": "How much did I spend on groceries last month?" }` and the backend will answer using your own transaction history. This uses the same Groq LLM that's already configured for parsing.
+Send a POST to `/assistant/query` with a JSON body `{ "question": "How much did I spend on groceries last month?" }` and the backend will answer using your own transaction history. This uses the same DeepSeek LLM that's already configured for parsing.
 
 ## 📄 Monthly Health Reports
 GET `/assistant/report?month=2025-12` generates a written summary of spending vs income for a given month. The endpoint also returns the raw aggregates if you want to render tables yourself.

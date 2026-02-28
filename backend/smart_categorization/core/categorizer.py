@@ -388,11 +388,14 @@ class SmartCategorizationEngine:
     
     def categorize(self, description: str, amount: float,
                    transaction_id: Optional[str] = None,
-                   use_llm_only: bool = False) -> CategorizationResult:
+                   use_llm_only: bool = False,
+                   enable_llm_fallback: bool = True) -> CategorizationResult:
         """
         Categorize a transaction.
         When use_llm_only=True (e.g. for PDF statements), skip merchant DB and ML,
-        and use Groq LLM directly for better accuracy on bank narrations.
+        and use the LLM directly for better accuracy on bank narrations.
+        When enable_llm_fallback=False, we rely purely on merchant DB + ML
+        (no best-effort LLM refinement step).
         """
         txn_id = transaction_id or hashlib.md5(
             f"{description}{amount}".encode()).hexdigest()[:8]
@@ -420,7 +423,7 @@ class SmartCategorizationEngine:
                 tags=self._generate_tags(cat, subcat, merchant, amount)
             )
         
-        # 2b. PDF / use_llm_only: skip merchant DB and ML, use Groq LLM directly
+        # 2b. PDF / use_llm_only: skip merchant DB and ML, use LLM directly
         if use_llm_only and self.llm.enabled():
             llm_res = self.llm.categorize(description, amount)
             if llm_res:
@@ -466,7 +469,7 @@ class SmartCategorizationEngine:
         # Threshold for when we consider ML "low confidence" and should lean on LLM.
         # Higher threshold => LLM used more often.
         try:
-            low_conf_threshold = float(os.getenv("ML_LOW_CONF_THRESHOLD", "0.80"))
+            low_conf_threshold = float(os.getenv("ML_LOW_CONF_THRESHOLD", "0.70"))
         except ValueError:
             low_conf_threshold = 0.80
 
@@ -484,10 +487,10 @@ class SmartCategorizationEngine:
             tags=self._generate_tags(cat, subcat, None, amount)
         )
 
-        # 5. LLM fallback (Groq-backed, via former Ollama client) when ML is unsure
+        # 5. LLM fallback when ML is unsure (optional, can be disabled for performance)
         # OR when we have no merchant match. We never override a strong merchant_db
         # match above, only unknown merchants.
-        if self.llm.enabled():
+        if enable_llm_fallback and self.llm.enabled():
             # Only run LLM when merchant is unknown (merchant DB did not match).
             llm_res = self.llm.categorize(description, amount)
             if llm_res and (needs_review or llm_res.confidence >= result.confidence):

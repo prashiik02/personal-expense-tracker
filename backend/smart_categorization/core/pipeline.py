@@ -94,12 +94,11 @@ class SmartCategorizationPipeline:
         print("Initializing Smart Categorization Pipeline...")
         
         # Import all components
-        from .categorizer import SmartCategorizationEngine
-        from .split_handler import SplitTransactionHandler
-        from .custom_categories import CustomCategoryBuilder
-        from .enrichment import MerchantEnrichmentEngine
+        from .categorizer import SmartCategorizationEngine, CategorizationResult
         from .p2p_detector import P2PDetector
-        
+        from .enrichment import MerchantEnrichmentEngine
+        from .custom_categories import CustomCategoryBuilder
+        from .split_handler import SplitTransactionHandler
         self.categorizer = SmartCategorizationEngine(feedback_path, model_path)
         self.splitter = SplitTransactionHandler()
         self.custom_cats = CustomCategoryBuilder(custom_cat_path)
@@ -109,7 +108,8 @@ class SmartCategorizationPipeline:
         print("Pipeline ready.")
     
     def process(self, transaction: Transaction,
-                use_llm_only: bool = False) -> ProcessedTransaction:
+                use_llm_only: bool = False,
+                enable_llm_fallback: bool | None = None) -> ProcessedTransaction:
         """
         Process a single transaction through the full pipeline.
         When use_llm_only=True (e.g. for PDF statements), categorization uses
@@ -117,6 +117,9 @@ class SmartCategorizationPipeline:
         Returns a fully enriched ProcessedTransaction.
         """
         
+        if enable_llm_fallback is None:
+            enable_llm_fallback = True
+
         desc = transaction.description
         amt = abs(transaction.amount)  # Work with positive amounts
         
@@ -125,7 +128,8 @@ class SmartCategorizationPipeline:
             description=desc,
             amount=amt,
             transaction_id=transaction.transaction_id,
-            use_llm_only=use_llm_only
+            use_llm_only=use_llm_only,
+            enable_llm_fallback=enable_llm_fallback,
         )
         
         # ── STEP 1b: P2P Detection (runs BEFORE enrichment, can override) ───
@@ -231,6 +235,121 @@ class SmartCategorizationPipeline:
             tags=tags,
             needs_review=cat_result.needs_review,
             processed_at=datetime.now().isoformat()
+        )
+
+    def process_with_category(
+        self,
+        transaction: Transaction,
+        category: str,
+        subcategory: str,
+        confidence: float = 0.8,
+        method: str = "llm_chunked",
+    ) -> ProcessedTransaction:
+        """
+        Process a transaction using pre-computed category/subcategory (e.g. from chunked LLM batch).
+        Runs P2P, enrichment, split, custom category, tags, and assembles output.
+        """
+        desc = transaction.description
+        amt = abs(transaction.amount)
+        cat_result = CategorizationResult(
+            transaction_id=transaction.transaction_id,
+            description=desc,
+            amount=amt,
+            predicted_category=category,
+            predicted_subcategory=subcategory,
+            confidence=confidence,
+            method=method,
+            merchant_record=None,
+            charge_type=None,
+            business_type=None,
+            logo_url=None,
+            is_split=False,
+            split_items=None,
+            tags=[],
+            needs_review=confidence < 0.7,
+        )
+        txn_type = "credit" if transaction.amount < 0 else "debit"
+        p2p = self.p2p.detect(desc, amt, transaction_type=txn_type)
+        if p2p.is_p2p:
+            cat_result.predicted_category = "Transfers & Payments"
+            cat_result.predicted_subcategory = p2p.suggested_subcategory
+            cat_result.method = "p2p_detector"
+            cat_result.confidence = p2p.confidence
+        enriched = self.enricher.enrich(
+            description=desc,
+            predicted_category=cat_result.predicted_category,
+            predicted_subcategory=cat_result.predicted_subcategory,
+            amount=amt,
+        )
+        is_split = False
+        split_items = None
+        if self.splitter.should_split(desc, enriched.canonical_name):
+            split_result = self.splitter.split(
+                description=desc, amount=amt, line_items=transaction.line_items
+            )
+            if split_result.was_split:
+                is_split = True
+                split_items = [
+                    {
+                        "description": item.description,
+                        "amount": item.amount,
+                        "category": item.category,
+                        "subcategory": item.subcategory,
+                        "percentage": item.percentage,
+                    }
+                    for item in split_result.split_items
+                ]
+        custom_cat = self.custom_cats.match_transaction(
+            description=desc,
+            amount=amt,
+            date=transaction.date,
+            merchant_name=enriched.canonical_name,
+            original_category=cat_result.predicted_category,
+        )
+        tags = list(cat_result.tags or [])
+        if custom_cat:
+            tags.extend(custom_cat.tags)
+        if is_split:
+            tags.append("split-transaction")
+        if p2p.is_p2p:
+            tags.append("p2p")
+            tags.append(f"p2p-{p2p.direction}")
+        if enriched.supports_emi:
+            tags.append("emi-eligible")
+        if enriched.charge_type == "subscription":
+            tags.append("subscription")
+        if transaction.amount < 0:
+            tags.append("credit")
+        tags = list(set(tags))
+        return ProcessedTransaction(
+            transaction_id=transaction.transaction_id,
+            date=transaction.date,
+            description=desc,
+            amount=transaction.amount,
+            currency=transaction.currency,
+            category=cat_result.predicted_category,
+            subcategory=cat_result.predicted_subcategory,
+            categorization_confidence=cat_result.confidence,
+            categorization_method=cat_result.method,
+            custom_category_id=custom_cat.category_id if custom_cat else None,
+            custom_category_name=custom_cat.name if custom_cat else None,
+            custom_category_icon=custom_cat.icon if custom_cat else None,
+            is_split=is_split,
+            split_items=split_items,
+            merchant_name=enriched.canonical_name,
+            merchant_logo=enriched.logo_url,
+            merchant_business_type=enriched.business_type,
+            charge_type=enriched.charge_type,
+            charge_description=enriched.charge_description,
+            supports_emi=enriched.supports_emi,
+            is_subscription=(enriched.charge_type == "subscription"),
+            is_p2p=p2p.is_p2p,
+            p2p_counterparty=p2p.counterparty_name if p2p.is_p2p else None,
+            p2p_direction=p2p.direction if p2p.is_p2p else None,
+            p2p_confidence=p2p.confidence,
+            tags=tags,
+            needs_review=cat_result.needs_review,
+            processed_at=datetime.now().isoformat(),
         )
     
     def process_batch(self, transactions: List[Transaction],

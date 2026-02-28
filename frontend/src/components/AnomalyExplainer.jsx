@@ -31,9 +31,17 @@ export default function AnomalyExplainer() {
         <button type="button" className="finsight-btn finsight-btn-primary" onClick={submit} disabled={loading}>{loading ? "Thinking…" : "Explain"}</button>
       </div>
 
-      {result && (
-        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)" }}>
-          {JSON.stringify(result, null, 2)}
+      {result?.error && (
+        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", border: "1px solid var(--finsight-danger)", color: "var(--finsight-danger)" }}>
+          {result.error}
+        </div>
+      )}
+      {result && !result.error && result.explanation && (
+        <div style={{ marginTop: "16px" }}>
+          <div style={{ fontSize: "10px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Explanation</div>
+          <div style={{ padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)", lineHeight: 1.5 }}>
+            {result.explanation}
+          </div>
         </div>
       )}
     </div>

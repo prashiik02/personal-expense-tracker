@@ -6,7 +6,7 @@ import re
 from typing import Optional, Dict, Any
 
 from dotenv import load_dotenv
-from groq import Groq
+from openai import OpenAI
 
 
 load_dotenv()
@@ -14,7 +14,7 @@ load_dotenv()
 
 class OllamaError(RuntimeError):
     """
-    Kept for backwards-compatibility. Now represents Groq-related errors.
+    Kept for backwards-compatibility. Now represents DeepSeek-related errors.
     """
 
 
@@ -44,9 +44,9 @@ class OllamaClient:
     """
     Backwards-compatible client wrapper.
 
-    Historically this talked to a local Ollama HTTP server. It is now
-    implemented on top of the Groq chat-completions API while preserving the
-    same interface that the rest of the app expects.
+    Historically this talked to a local Ollama HTTP server, then to Groq.
+    It is now implemented on top of the DeepSeek chat-completions API while
+    preserving the same interface that the rest of the app expects.
     """
 
     def __init__(
@@ -56,21 +56,21 @@ class OllamaClient:
         timeout_s: int = 20,
         enabled: bool | None = None,
     ):
-        # Groq configuration
-        api_key = os.getenv("GROQ_API_KEY")
+        # DeepSeek configuration (OpenAI-compatible client)
+        api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             # If there's no API key we treat the client as disabled.
             self.client = None
             self.enabled = False
         else:
-            self.client = Groq(api_key=api_key)
+            ds_base = base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+            self.client = OpenAI(api_key=api_key, base_url=ds_base)
             # Allow overriding default model via env, but keep a sensible default.
-            # Groq docs recommend llama-3.3-70b-versatile as the successor to
-            # the decommissioned llama-3.1-70b-versatile.
             self.model = (
                 model
-                or os.getenv("GROQ_MODEL")
-                or "llama-3.3-70b-versatile"
+                or os.getenv("DEEPSEEK_JSON_MODEL")
+                or os.getenv("DEEPSEEK_MODEL")
+                or "deepseek-chat"
             )
             self.enabled = (
                 _env_bool("OLLAMA_ENABLED", True) if enabled is None else bool(enabled)
@@ -87,12 +87,12 @@ class OllamaClient:
         temperature: float = 0.1,
     ) -> Dict[str, Any]:
         """
-        Call Groq chat completions and return a parsed JSON object.
+        Call DeepSeek chat completions and return a parsed JSON object.
         """
         if not self.enabled or not self.client:
             raise OllamaError(
-                "Groq client is disabled or GROQ_API_KEY is missing. "
-                "Set GROQ_API_KEY in your environment and ensure OLLAMA_ENABLED is not false."
+                "DeepSeek client is disabled or DEEPSEEK_API_KEY is missing. "
+                "Set DEEPSEEK_API_KEY in your environment and ensure OLLAMA_ENABLED is not false."
             )
 
         messages = []
@@ -106,9 +106,10 @@ class OllamaClient:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=2048,
+                response_format={"type": "json_object"},
             )
         except Exception as e:
-            raise OllamaError(f"Groq API request failed: {e}")
+            raise OllamaError(f"DeepSeek API request failed: {e}")
 
         content = (response.choices[0].message.content or "").strip()
 
@@ -128,12 +129,12 @@ class OllamaClient:
                 obj = json.loads(content)
             except Exception as e:
                 raise OllamaError(
-                    f"Could not parse Groq JSON response: {str(e)} | raw: {content[:200]}"
+                    f"Could not parse DeepSeek JSON response: {str(e)} | raw: {content[:200]}"
                 )
 
         if not isinstance(obj, dict):
             raise OllamaError(
-                f"Groq JSON response is not an object as expected: {str(obj)[:200]}"
+                f"DeepSeek JSON response is not an object as expected: {str(obj)[:200]}"
             )
 
         return obj

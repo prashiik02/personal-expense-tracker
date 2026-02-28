@@ -25,6 +25,7 @@ class CategorizeBatchSchema(BaseModel):
     csv_text: Optional[str] = None
     include_summary: bool = True
     return_results: bool = True
+    use_llm_chunked: bool = False  # When true, split batch and categorize via Gemini/DeepSeek per chunk
 
 
 class CategorizeSmsSchema(BaseModel):
