@@ -1,20 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 
-const COLORS = {
-  primary: "#3498db",
-  dark: "#2c3e50",
-  light: "#fafafa",
-  white: "#ffffff",
-  gray: "#7f8c8d",
-  lightGray: "#ecf0f1",
-  border: "#e0e6ed",
-  success: "#27ae60",
-  warning: "#f39c12",
-  info: "#9b59b6",
-  secondary: "#1abc9c",
-};
-
 export default function QuickActionCard({ title, description, icon, color, link, onClick }) {
   const Component = link ? Link : "div";
 
@@ -23,9 +9,9 @@ export default function QuickActionCard({ title, description, icon, color, link,
       to={link}
       onClick={onClick}
       style={{
-        backgroundColor: COLORS.white,
+        backgroundColor: "var(--finsight-surface)",
         border: `1.5px solid ${color}22`,
-        borderRadius: 8,
+        borderRadius: 12,
         padding: 20,
         textDecoration: "none",
         color: "inherit",
@@ -35,7 +21,7 @@ export default function QuickActionCard({ title, description, icon, color, link,
         minWidth: 180,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = `0 4px 12px ${color}22`;
+        e.currentTarget.style.boxShadow = "var(--finsight-shadow)";
         e.currentTarget.style.transform = "translateY(-2px)";
         e.currentTarget.style.borderColor = color;
       }}
@@ -46,10 +32,10 @@ export default function QuickActionCard({ title, description, icon, color, link,
       }}
     >
       <div style={{ fontSize: 32, marginBottom: 12 }}>{icon}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.dark, marginBottom: 4 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: "var(--finsight-text)", marginBottom: 4 }}>
         {title}
       </div>
-      <div style={{ fontSize: 12, color: COLORS.gray }}>
+      <div style={{ fontSize: 12, color: "var(--finsight-muted)" }}>
         {description}
       </div>
     </Component>

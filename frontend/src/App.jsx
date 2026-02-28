@@ -7,6 +7,7 @@ import Categorize from "./pages/Categorize";
 import Assistant from "./pages/Assistant";
 import Navbar from "./components/Navbar";
 import { useAuth } from "./hooks/useAuth";
+import ThemeToggle from "./components/ThemeToggle";
 
 function App() {
   const { user } = useAuth();
@@ -19,6 +20,11 @@ function App() {
   return (
     <>
       {user && <Navbar />}
+      {!user && (
+        <div style={{ position: "fixed", top: 16, right: 16, zIndex: 5 }}>
+          <ThemeToggle />
+        </div>
+      )}
       <main className={user ? "finsight-app" : "finsight-app finsight-auth-wrap"}>
         <Routes>
           <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />

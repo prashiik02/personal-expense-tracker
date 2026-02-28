@@ -640,17 +640,17 @@ export default function Categorize() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
 
         {processedSingle && (
-          <div style={{ marginTop: 12, border: "1px solid #eee", padding: 12 }}>
+          <div style={{ marginTop: 12, border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12 }}>
             <h3 style={{ marginTop: 0, marginBottom: 10 }}>Result (single)</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div>
-                <div style={{ color: "#666", fontSize: 12 }}>Category</div>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Category</div>
                 <div style={{ fontWeight: 600 }}>
                   {processedSingle.category} &gt; {processedSingle.subcategory}
                 </div>
               </div>
               <div>
-                <div style={{ color: "#666", fontSize: 12 }}>Confidence</div>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Confidence</div>
                 <div style={{ fontWeight: 600 }}>
                   {Math.round((processedSingle.categorization_confidence || 0) * 100)}%
                   {" · "}
@@ -658,22 +658,22 @@ export default function Categorize() {
                 </div>
               </div>
               <div>
-                <div style={{ color: "#666", fontSize: 12 }}>Merchant</div>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Merchant</div>
                 <div>{processedSingle.merchant_name || "-"}</div>
               </div>
               <div>
-                <div style={{ color: "#666", fontSize: 12 }}>Amount</div>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Amount</div>
                 <div>₹{formatINR(Math.abs(processedSingle.amount || 0))}</div>
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
-                <div style={{ color: "#666", fontSize: 12 }}>Tags</div>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Tags</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {(processedSingle.tags || []).length ? (
                     (processedSingle.tags || []).map((t) => (
                       <span
                         key={t}
                         style={{
-                          border: "1px solid #ddd",
+                          border: "1px solid var(--finsight-border)",
                           padding: "2px 8px",
                           borderRadius: 999,
                           fontSize: 12,
@@ -689,15 +689,15 @@ export default function Categorize() {
               </div>
               {processedSingle.is_split && (
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <div style={{ color: "#666", fontSize: 12 }}>Split items</div>
-                  <pre style={{ background: "#f7f7f7", padding: 12, overflowX: "auto" }}>
+                  <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Split items</div>
+                  <pre style={{ background: "var(--finsight-surface2)", border: "1px solid var(--finsight-border)", borderRadius: 10, padding: 12, overflowX: "auto" }}>
                     {JSON.stringify(processedSingle.split_items, null, 2)}
                   </pre>
                 </div>
               )}
             </div>
             <div style={{ marginTop: 10 }}>
-              <button type="button" onClick={() => openCorrection(processedSingle)}>
+              <button type="button" className="finsight-btn" onClick={() => openCorrection(processedSingle)}>
                 Submit correction (optional learning)
               </button>
             </div>
@@ -708,12 +708,13 @@ export default function Categorize() {
           <div style={{ marginTop: 12 }}>
             <h3 style={{ marginBottom: 8 }}>Analysis</h3>
 
-            <div style={{ border: "1px solid #eee", padding: 12, marginBottom: 12 }}>
+            <div style={{ border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
               <div style={{ fontWeight: 600, marginBottom: 10 }}>Filters</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                 <label>
                   Search
                   <input
+                    className="finsight-input"
                     value={filters.search}
                     onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                     placeholder="zomato / uber / netflix..."
@@ -722,6 +723,7 @@ export default function Categorize() {
                 <label>
                   Date from
                   <input
+                    className="finsight-input"
                     type="date"
                     value={filters.dateFrom}
                     onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
@@ -730,6 +732,7 @@ export default function Categorize() {
                 <label>
                   Date to
                   <input
+                    className="finsight-input"
                     type="date"
                     value={filters.dateTo}
                     onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
@@ -738,6 +741,7 @@ export default function Categorize() {
                 <label>
                   Category
                   <select
+                    className="finsight-input"
                     value={filters.category}
                     onChange={(e) => setFilters({ ...filters, category: e.target.value })}
                   >
@@ -752,6 +756,7 @@ export default function Categorize() {
                 <label>
                   Merchant contains
                   <input
+                    className="finsight-input"
                     value={filters.merchant}
                     onChange={(e) => setFilters({ ...filters, merchant: e.target.value })}
                     placeholder="amazon / swiggy..."
@@ -761,6 +766,7 @@ export default function Categorize() {
                   <label>
                     Min amount
                     <input
+                      className="finsight-input"
                       type="number"
                       value={filters.minAmount}
                       onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
@@ -770,6 +776,7 @@ export default function Categorize() {
                   <label>
                     Max amount
                     <input
+                      className="finsight-input"
                       type="number"
                       value={filters.maxAmount}
                       onChange={(e) => setFilters({ ...filters, maxAmount: e.target.value })}
@@ -807,6 +814,7 @@ export default function Categorize() {
                 </label>
                 <button
                   type="button"
+                  className="finsight-btn"
                   onClick={() =>
                     setFilters({
                       search: "",
@@ -825,30 +833,30 @@ export default function Categorize() {
                   Reset filters
                 </button>
               </div>
-              <div style={{ marginTop: 8, color: "#555", fontSize: 13 }}>
+              <div style={{ marginTop: 8, color: "var(--finsight-muted)", fontSize: 13 }}>
                 Showing <strong>{filteredSummary.count}</strong> transactions after filters.
               </div>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-              <div style={{ border: "1px solid #eee", padding: 12 }}>
-                <div style={{ color: "#666", fontSize: 12 }}>Transactions</div>
+              <div style={{ border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12 }}>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Transactions</div>
                 <div style={{ fontWeight: 700, fontSize: 18 }}>{filteredSummary.count}</div>
               </div>
-              <div style={{ border: "1px solid #eee", padding: 12 }}>
-                <div style={{ color: "#666", fontSize: 12 }}>Total spend</div>
+              <div style={{ border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12 }}>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Total spend</div>
                 <div style={{ fontWeight: 700, fontSize: 18 }}>
                   ₹{formatINR(filteredSummary.total_spend)}
                 </div>
               </div>
-              <div style={{ border: "1px solid #eee", padding: 12 }}>
-                <div style={{ color: "#666", fontSize: 12 }}>Needs review</div>
+              <div style={{ border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12 }}>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Needs review</div>
                 <div style={{ fontWeight: 700, fontSize: 18 }}>
                   {filteredSummary.needs_review_count}
                 </div>
               </div>
-              <div style={{ border: "1px solid #eee", padding: 12 }}>
-                <div style={{ color: "#666", fontSize: 12 }}>Split txns</div>
+              <div style={{ border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12 }}>
+                <div style={{ color: "var(--finsight-muted)", fontSize: 12 }}>Split txns</div>
                 <div style={{ fontWeight: 700, fontSize: 18 }}>
                   {filteredSummary.split_transactions}
                 </div>
@@ -856,7 +864,7 @@ export default function Categorize() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
-              <div style={{ height: 320, border: "1px solid #eee", padding: 12 }}>
+              <div style={{ height: 320, border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>Top categories by spend</div>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -872,7 +880,7 @@ export default function Categorize() {
                 </ResponsiveContainer>
               </div>
 
-              <div style={{ height: 320, border: "1px solid #eee", padding: 12 }}>
+              <div style={{ height: 320, border: "1px solid var(--finsight-border)", background: "var(--finsight-surface)", borderRadius: 12, padding: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>Monthly spend trend</div>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={monthTrendData} margin={{ top: 8, right: 8, bottom: 24, left: 8 }}>
@@ -898,7 +906,7 @@ export default function Categorize() {
                           key={h}
                           style={{
                             textAlign: "left",
-                            borderBottom: "1px solid #ddd",
+                            borderBottom: "1px solid var(--finsight-border)",
                             padding: "8px 6px",
                             fontSize: 13,
                           }}
@@ -911,22 +919,22 @@ export default function Categorize() {
                   <tbody>
                     {filteredResults.slice(0, 200).map((r) => (
                       <tr key={`${r.transaction_id}-${r.date}-${r.amount}`}>
-                        <td style={{ padding: "8px 6px", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}>
+                        <td style={{ padding: "8px 6px", borderBottom: "1px solid var(--finsight-border)", fontSize: 13 }}>
                           {r.date}
                         </td>
-                        <td style={{ padding: "8px 6px", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}>
+                        <td style={{ padding: "8px 6px", borderBottom: "1px solid var(--finsight-border)", fontSize: 13 }}>
                           {r.description}
                         </td>
-                        <td style={{ padding: "8px 6px", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}>
+                        <td style={{ padding: "8px 6px", borderBottom: "1px solid var(--finsight-border)", fontSize: 13 }}>
                           ₹{formatINR(Math.abs(Number(r.amount || 0)))}
                         </td>
-                        <td style={{ padding: "8px 6px", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}>
+                        <td style={{ padding: "8px 6px", borderBottom: "1px solid var(--finsight-border)", fontSize: 13 }}>
                           {r.category} &gt; {r.subcategory}
                         </td>
-                        <td style={{ padding: "8px 6px", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}>
+                        <td style={{ padding: "8px 6px", borderBottom: "1px solid var(--finsight-border)", fontSize: 13 }}>
                           {r.merchant_name || "-"}
                         </td>
-                        <td style={{ padding: "8px 6px", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}>
+                        <td style={{ padding: "8px 6px", borderBottom: "1px solid var(--finsight-border)", fontSize: 13 }}>
                           {r.needs_review ? "review " : ""}
                           {r.is_split ? "split " : ""}
                           {r.charge_type === "subscription" ? "sub " : ""}
@@ -936,7 +944,7 @@ export default function Categorize() {
                   </tbody>
                 </table>
                 {filteredResults.length > 200 && (
-                  <div style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
+                  <div style={{ marginTop: 8, color: "var(--finsight-muted)", fontSize: 13 }}>
                     Showing first 200 rows. Use filters to narrow down.
                   </div>
                 )}
@@ -945,7 +953,7 @@ export default function Categorize() {
 
             <details style={{ marginTop: 12 }}>
               <summary style={{ cursor: "pointer" }}>Results (JSON)</summary>
-              <pre style={{ background: "#f7f7f7", padding: 12, overflowX: "auto" }}>
+              <pre style={{ background: "var(--finsight-surface2)", border: "1px solid var(--finsight-border)", borderRadius: 10, padding: 12, overflowX: "auto" }}>
                 {JSON.stringify(tab === "pdf" ? pdfResponse : result, null, 2)}
               </pre>
             </details>
@@ -955,7 +963,7 @@ export default function Categorize() {
         {result && (
           <div style={{ marginTop: 12 }}>
             <h3 style={{ marginBottom: 8 }}>Result</h3>
-            <pre style={{ background: "#f7f7f7", padding: 12, overflowX: "auto" }}>
+            <pre style={{ background: "var(--finsight-surface2)", border: "1px solid var(--finsight-border)", borderRadius: 10, padding: 12, overflowX: "auto" }}>
               {JSON.stringify(result, null, 2)}
             </pre>
           </div>
@@ -974,12 +982,13 @@ export default function Categorize() {
             padding: 16,
           }}
         >
-          <div style={{ background: "white", width: "min(720px, 100%)", padding: 16 }}>
+          <div style={{ background: "var(--finsight-surface)", border: "1px solid var(--finsight-border)", borderRadius: 12, width: "min(720px, 100%)", padding: 16 }}>
             <h3 style={{ marginTop: 0 }}>Submit correction</h3>
             <div style={{ display: "grid", gap: 10 }}>
               <label>
                 Transaction ID
                 <input
+                  className="finsight-input"
                   value={correction.transaction_id}
                   onChange={(e) => setCorrection({ ...correction, transaction_id: e.target.value })}
                 />
@@ -987,6 +996,7 @@ export default function Categorize() {
               <label>
                 Description
                 <input
+                  className="finsight-input"
                   value={correction.description}
                   onChange={(e) => setCorrection({ ...correction, description: e.target.value })}
                 />
@@ -994,17 +1004,19 @@ export default function Categorize() {
               <label>
                 Merchant (optional)
                 <input
+                  className="finsight-input"
                   value={correction.merchant_name}
                   onChange={(e) => setCorrection({ ...correction, merchant_name: e.target.value })}
                 />
               </label>
               <label>
                 Old category
-                <input value={correction.old_category} readOnly />
+                <input className="finsight-input" value={correction.old_category} readOnly />
               </label>
               <label>
                 New category
                 <input
+                  className="finsight-input"
                   value={correction.new_category}
                   onChange={(e) => setCorrection({ ...correction, new_category: e.target.value })}
                 />
@@ -1012,16 +1024,17 @@ export default function Categorize() {
               <label>
                 New subcategory
                 <input
+                  className="finsight-input"
                   value={correction.new_subcategory}
                   onChange={(e) => setCorrection({ ...correction, new_subcategory: e.target.value })}
                 />
               </label>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
-              <button type="button" onClick={() => setCorrectionOpen(false)} disabled={isLoading}>
+              <button type="button" className="finsight-btn" onClick={() => setCorrectionOpen(false)} disabled={isLoading}>
                 Cancel
               </button>
-              <button type="button" onClick={submitCorrection} disabled={isLoading}>
+              <button type="button" className="finsight-btn finsight-btn-primary" onClick={submitCorrection} disabled={isLoading}>
                 {isLoading ? "Saving..." : "Save correction"}
               </button>
             </div>

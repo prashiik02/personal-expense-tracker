@@ -1,17 +1,29 @@
 /* FinSight theme — applied across all pages */
 :root {
-  --finsight-bg: #0a0a0f;
-  --finsight-surface: #12121a;
-  --finsight-surface2: #1a1a26;
-  --finsight-border: #2a2a3e;
+  /* Default = Light theme */
+  --finsight-bg: #f6f7fb;
+  --finsight-surface: #ffffff;
+  --finsight-surface2: #eef1f7;
+  --finsight-border: #dde3ef;
   --finsight-accent: #7c6af7;
   --finsight-accent2: #f7706a;
   --finsight-accent3: #4ad8a0;
   --finsight-accent4: #f7c26a;
-  --finsight-text: #e8e8f0;
-  --finsight-muted: #6b6b8a;
+  --finsight-text: #141527;
+  --finsight-muted: #5f637a;
   --finsight-danger: #f7706a;
   --finsight-success: #4ad8a0;
+  --finsight-shadow: 0 10px 30px rgba(13, 16, 27, 0.10);
+}
+
+.finsight-theme-dark {
+  --finsight-bg: #0a0a0f;
+  --finsight-surface: #12121a;
+  --finsight-surface2: #1a1a26;
+  --finsight-border: #2a2a3e;
+  --finsight-text: #e8e8f0;
+  --finsight-muted: #6b6b8a;
+  --finsight-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }

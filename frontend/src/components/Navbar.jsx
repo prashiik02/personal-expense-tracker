@@ -1,6 +1,7 @@
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import React from "react";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -32,6 +33,7 @@ export default function Navbar() {
             {user.email}
           </span>
         )}
+        <ThemeToggle />
         <button
           type="button"
           onClick={logout}

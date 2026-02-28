@@ -1,36 +1,22 @@
 import React from "react";
 
-const COLORS = {
-  primary: "#3498db",
-  dark: "#2c3e50",
-  light: "#fafafa",
-  white: "#ffffff",
-  gray: "#7f8c8d",
-  lightGray: "#ecf0f1",
-  border: "#e0e6ed",
-  success: "#27ae60",
-  warning: "#f39c12",
-  info: "#9b59b6",
-  secondary: "#1abc9c",
-};
-
 const CATEGORY_COLORS = {
-  groceries: COLORS.success,
-  food_delivery: COLORS.warning,
-  fuel: COLORS.danger,
-  transport: COLORS.secondary,
-  utilities: COLORS.info,
-  shopping: COLORS.primary,
-  entertainment: COLORS.warning,
-  emi_loan: COLORS.danger,
-  salary: COLORS.success,
-  default: COLORS.primary,
+  groceries: "var(--finsight-success)",
+  food_delivery: "var(--finsight-accent4)",
+  fuel: "var(--finsight-danger)",
+  transport: "var(--finsight-accent)",
+  utilities: "var(--finsight-accent)",
+  shopping: "var(--finsight-accent)",
+  entertainment: "var(--finsight-accent4)",
+  emi_loan: "var(--finsight-danger)",
+  salary: "var(--finsight-success)",
+  default: "var(--finsight-accent)",
 };
 
 export default function CategoryBreakdown({ categories }) {
   if (!categories || Object.keys(categories).length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: 40, color: COLORS.gray }}>
+      <div style={{ textAlign: "center", padding: 40, color: "var(--finsight-muted)" }}>
         <p>No spending data available</p>
       </div>
     );
@@ -57,18 +43,18 @@ export default function CategoryBreakdown({ categories }) {
                 marginBottom: 6,
               }}
             >
-              <span style={{ fontSize: 13, fontWeight: 600, color: COLORS.dark }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--finsight-text)" }}>
                 {category.replace(/_/g, " ")}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.dark }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--finsight-text)" }}>
                 ₹{amount.toFixed(0)} ({percentage}%)
               </span>
             </div>
             <div
               style={{
                 height: 6,
-                backgroundColor: COLORS.lightGray,
-                borderRadius: 3,
+                backgroundColor: "var(--finsight-surface2)",
+                borderRadius: 999,
                 overflow: "hidden",
               }}
             >
