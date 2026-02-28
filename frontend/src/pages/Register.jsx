@@ -17,9 +17,23 @@ export default function Register() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const validateStrongPassword = (pw) => {
+    if (!pw || pw.length < 8) return "Password must be at least 8 characters.";
+    if (!/[A-Z]/.test(pw)) return "Password must contain at least one uppercase letter.";
+    if (!/[a-z]/.test(pw)) return "Password must contain at least one lowercase letter.";
+    if (!/\d/.test(pw)) return "Password must contain at least one number.";
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) return "Password must contain at least one special character (!@#$%^&* etc.).";
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    const pwErr = validateStrongPassword(form.password);
+    if (pwErr) {
+      setError(pwErr);
+      return;
+    }
     if (form.password !== form.confirmPassword) {
       setError("Passwords do not match.");
       return;
@@ -38,7 +52,7 @@ export default function Register() {
         monthly_income: income,
       };
       await register(payload);
-      navigate("/");
+      navigate("/login");
     } catch (err) {
       const message =
         err?.response?.data?.error ||
@@ -102,8 +116,9 @@ export default function Register() {
             className="finsight-input"
             value={form.password}
             type="password"
-            placeholder="Create a password"
+            placeholder="Min 8 chars, upper, lower, number, special"
             autoComplete="new-password"
+            title="Min 8 characters, at least one uppercase, lowercase, number, and special character"
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
           />

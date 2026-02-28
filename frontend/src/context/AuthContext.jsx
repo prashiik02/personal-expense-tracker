@@ -21,8 +21,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (data) => {
     const res = await registerUser(data);
-    setUser(res);
-    localStorage.setItem("user", JSON.stringify(res));
+    // Do not auto-login: user must sign in on the login page after registration.
     return res;
   };
 

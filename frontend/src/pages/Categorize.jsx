@@ -245,8 +245,9 @@ export default function Categorize() {
   const handleCsvFile = async (file) => {
     if (!file) return;
     setCsvFileName(file.name);
-    const text = await file.text();
-    setCsvText(text);
+    let text = await file.text();
+    text = text.replace(/^\uFEFF/, "");
+    setCsvText(text.trim());
   };
 
   const handlePdfFile = (file) => {
@@ -329,8 +330,14 @@ export default function Categorize() {
       }
 
       if (tab === "batch") {
+        const trimmed = (csvText || "").trim();
+        if (!trimmed) {
+          setError("Please upload a CSV file or paste CSV content (headers: transaction_id, date, description, amount).");
+          setIsLoading(false);
+          return;
+        }
         const data = await categorizeBatch({
-          csv_text: csvText,
+          csv_text: trimmed,
           include_summary: true,
           return_results: true,
           use_llm_chunked: useLlmChunked,
