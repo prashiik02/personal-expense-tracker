@@ -31,7 +31,7 @@ export default function ReportView() {
 
   return (
     <div>
-      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Monthly Health Report</div>
+      <div className="finsight-card-title">Monthly report</div>
       <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
         <input className="finsight-input" placeholder="YYYY-MM (optional)" value={month} onChange={(e) => setMonth(e.target.value)} style={{ flex: "1", minWidth: 140 }} />
         <button type="button" className="finsight-btn finsight-btn-primary" onClick={fetchReport} disabled={loading}>{loading ? "Loading…" : "Generate"}</button>

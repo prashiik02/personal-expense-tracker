@@ -113,7 +113,7 @@ class SmartCategorizationPipeline:
         """
         Process a single transaction through the full pipeline.
         When use_llm_only=True (e.g. for PDF statements), categorization uses
-        Groq LLM only, skipping merchant DB and ML model.
+        DeepSeek LLM only, skipping merchant DB and ML model.
         Returns a fully enriched ProcessedTransaction.
         """
         

@@ -381,12 +381,17 @@ export default function Categorize() {
         return;
       }
     } catch (err) {
-      const msg =
+      let msg =
         err?.response?.data?.error ||
         err?.response?.data?.msg ||
         err?.message ||
         "Request failed";
-      setError(typeof msg === "string" ? msg : "Request failed");
+      if (typeof msg !== "string") msg = "Request failed";
+      if (err?.message === "Network Error" || !err?.response) {
+        msg =
+          "Connection failed. Ensure the backend is running. For LLM features, check DEEPSEEK_API_KEY or GEMINI_API_KEY in backend/.env and that the backend can reach the APIs.";
+      }
+      setError(msg);
     } finally {
       if (tab === "pdf") {
         stopPdfProgress();
@@ -456,24 +461,21 @@ export default function Categorize() {
   return (
     <>
       <header className="finsight-header">
-        <div>
-          <div className="finsight-card-title" style={{ marginBottom: 0 }}>Categorize transactions</div>
-          <p style={{ fontSize: "11px", color: "var(--finsight-muted)", marginTop: "4px" }}>
-            Test raw descriptions, bank SMS, CSV batches, and split line items.
-          </p>
-        </div>
+        <h1 className="finsight-header-title">Categorize</h1>
+        <p className="finsight-header-subtitle">
+          Add transactions via raw input, bank SMS, CSV batch, or PDF statement.
+        </p>
       </header>
 
-      <div className="finsight-card" style={{ marginBottom: "20px" }}>
-        <div className="finsight-card-title" style={{ marginBottom: "12px" }}>Choose input type</div>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <div className="finsight-card" style={{ marginBottom: "24px" }}>
+        <div className="finsight-card-title">Input type</div>
+        <div className="finsight-tabs">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={"finsight-btn" + (tab === t.id ? " finsight-btn-primary" : "")}
-              style={{ padding: "10px 18px", fontSize: "12px" }}
+              className={"finsight-tab" + (tab === t.id ? " active" : "")}
             >
               {t.label}
             </button>
@@ -500,7 +502,7 @@ export default function Categorize() {
               <input className="finsight-input" type="number" value={rawForm.amount} onChange={(e) => setRawForm({ ...rawForm, amount: Number(e.target.value) })} placeholder="450" />
             </div>
             <div className="finsight-form-actions">
-              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              {error && <span style={{ color: "var(--finsight-danger)", fontSize: "12px" }}>{error}</span>}
               <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
               {(result || pdfResponse) && (
                 <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(tab === "pdf" ? pdfResponse : result, null, 2))}>Download JSON</button>
@@ -523,7 +525,7 @@ export default function Categorize() {
               <textarea className="finsight-input" rows={5} value={smsForm.sms_text} onChange={(e) => setSmsForm({ ...smsForm, sms_text: e.target.value })} placeholder="Paste bank SMS here" />
             </div>
             <div className="finsight-form-actions">
-              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              {error && <span style={{ color: "var(--finsight-danger)", fontSize: "12px" }}>{error}</span>}
               <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
               {(result || pdfResponse) && (
                 <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(result, null, 2))}>Download JSON</button>
@@ -562,7 +564,7 @@ export default function Categorize() {
               </pre>
             </details>
             <div className="finsight-form-actions">
-              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              {error && <span style={{ color: "var(--finsight-danger)", fontSize: "12px" }}>{error}</span>}
               <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
               {(result || pdfResponse) && (
                 <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(result, null, 2))}>Download JSON</button>
@@ -597,7 +599,7 @@ export default function Categorize() {
               <textarea className="finsight-input" rows={6} value={itemsForm.line_items_json} onChange={(e) => setItemsForm({ ...itemsForm, line_items_json: e.target.value })} />
             </div>
             <div className="finsight-form-actions">
-              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              {error && <span style={{ color: "var(--finsight-danger)", fontSize: "12px" }}>{error}</span>}
               <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
               {(result || pdfResponse) && (
                 <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(result, null, 2))}>Download JSON</button>
@@ -637,7 +639,7 @@ export default function Categorize() {
             )}
             <p style={{ fontSize: "11px", color: "var(--finsight-muted)", marginTop: "8px" }}>Note: scanned/image PDFs may need OCR (not added yet).</p>
             <div className="finsight-form-actions">
-              {error && <span style={{ color: "var(--finsight-accent2)", fontSize: "12px" }}>{error}</span>}
+              {error && <span style={{ color: "var(--finsight-danger)", fontSize: "12px" }}>{error}</span>}
               <button type="button" className="finsight-btn finsight-btn-primary" onClick={handleSubmit} disabled={!canSubmit}>{isLoading ? "Processing…" : "Run categorization"}</button>
               {(result || pdfResponse) && (
                 <button type="button" className="finsight-btn" onClick={() => downloadText(`categorization_${tab}_${Date.now()}.json`, JSON.stringify(pdfResponse, null, 2))}>Download JSON</button>

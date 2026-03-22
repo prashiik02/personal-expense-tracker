@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { askAssistant } from "../api/assistantApi";
+import RichAdviceText from "./RichAdviceText";
 
 export default function ChatAssistant() {
   const [question, setQuestion] = useState("");
@@ -22,16 +23,16 @@ export default function ChatAssistant() {
 
   return (
     <div>
-      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Assistant Chat</div>
+      <div className="finsight-card-title">Chat</div>
       <textarea
         className="finsight-input"
         value={question}
         onChange={(e) => setQuestion(e.target.value)}
-        rows={4}
+        rows={3}
         style={{ width: "100%", marginBottom: "12px", resize: "vertical" }}
-        placeholder="Ask about your spending, budgets, or taxes"
+        placeholder="Ask about your spending, budgets, or taxes…"
       />
-      <div style={{ display: "flex", gap: "8px" }}>
+      <div style={{ display: "flex", gap: "12px" }}>
         <button type="button" className="finsight-btn finsight-btn-primary" onClick={send} disabled={loading}>
           {loading ? "Thinking…" : "Ask"}
         </button>
@@ -39,17 +40,16 @@ export default function ChatAssistant() {
           Clear
         </button>
       </div>
-
       {answer && (
-        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", border: "1px solid var(--finsight-border)", lineHeight: 1.5 }}>
+        <div style={{ marginTop: "16px", padding: "16px", background: "var(--finsight-surface2)", borderRadius: "var(--finsight-radius-sm)", fontSize: "14px", border: "1px solid var(--finsight-border)", lineHeight: 1.6 }}>
           {typeof answer === "string" ? (
-            <div style={{ whiteSpace: "pre-wrap" }}>{answer}</div>
+            <RichAdviceText text={answer} />
           ) : answer.error ? (
             <div style={{ color: "var(--finsight-danger)" }}>{String(answer.error)}</div>
           ) : answer.answer ? (
-            <div style={{ whiteSpace: "pre-wrap" }}>{answer.answer}</div>
+            <RichAdviceText text={typeof answer.answer === "string" ? answer.answer : String(answer.answer)} />
           ) : (
-            <div style={{ whiteSpace: "pre-wrap" }}>{String(answer)}</div>
+            <RichAdviceText text={String(answer)} />
           )}
         </div>
       )}

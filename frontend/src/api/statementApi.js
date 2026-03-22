@@ -1,4 +1,4 @@
-import { API } from "./client";
+import { API, LLM_TIMEOUT_MS } from "./client";
 
 export const analyzeStatementPdf = async ({ file, bank = "generic", maxPages = 20 }) => {
   const form = new FormData();
@@ -9,6 +9,7 @@ export const analyzeStatementPdf = async ({ file, bank = "generic", maxPages = 2
 
   const res = await API.post("/statements/analyze", form, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: LLM_TIMEOUT_MS,
   });
   return res.data;
 };

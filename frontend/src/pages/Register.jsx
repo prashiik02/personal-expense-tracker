@@ -22,7 +22,7 @@ export default function Register() {
     if (!/[A-Z]/.test(pw)) return "Password must contain at least one uppercase letter.";
     if (!/[a-z]/.test(pw)) return "Password must contain at least one lowercase letter.";
     if (!/\d/.test(pw)) return "Password must contain at least one number.";
-    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) return "Password must contain at least one special character (!@#$%^&* etc.).";
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) return "Password must contain at least one special character.";
     return null;
   };
 
@@ -38,44 +38,36 @@ export default function Register() {
       setError("Passwords do not match.");
       return;
     }
-    setIsSubmitting(true);
     const income = Number(form.monthly_income);
     if (!Number.isFinite(income) || income <= 0) {
       setError("Please enter a valid monthly income (₹) greater than 0.");
       return;
     }
+    setIsSubmitting(true);
     try {
-      const payload = {
+      await register({
         name: form.name,
         email: form.email,
         password: form.password,
         monthly_income: income,
-      };
-      await register(payload);
+      });
       navigate("/login");
     } catch (err) {
-      const message =
-        err?.response?.data?.error ||
-        err?.message ||
-        "Registration failed. Please try again.";
+      const message = err?.response?.data?.error || err?.message || "Registration failed. Please try again.";
       setError(typeof message === "string" ? message : "Registration failed.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const labelStyle = { fontSize: "11px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px" };
-
   return (
-    <div className="finsight-card" style={{ maxWidth: 420, width: "100%" }}>
-      <div style={{ marginBottom: "24px" }}>
-        <div className="finsight-logo" style={{ fontSize: "24px", marginBottom: "4px" }}>Fin<span>Sight</span></div>
-        <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>Create your account</p>
-      </div>
+    <div className="finsight-auth-card">
+      <h1 className="finsight-auth-title">Create your account</h1>
+      <p className="finsight-auth-subtitle">Start tracking your expenses today</p>
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "16px" }}>
-        <label style={{ display: "grid", gap: "6px" }}>
-          <span style={labelStyle}>Name</span>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div className="finsight-form-row">
+          <label className="finsight-form-label">Full name</label>
           <input
             className="finsight-input"
             value={form.name}
@@ -84,10 +76,9 @@ export default function Register() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             required
           />
-        </label>
-
-        <label style={{ display: "grid", gap: "6px" }}>
-          <span style={labelStyle}>Email</span>
+        </div>
+        <div className="finsight-form-row">
+          <label className="finsight-form-label">Email address</label>
           <input
             className="finsight-input"
             value={form.email}
@@ -96,10 +87,9 @@ export default function Register() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-        </label>
-
-        <label style={{ display: "grid", gap: "6px" }}>
-          <span style={labelStyle}>Monthly income (₹) *</span>
+        </div>
+        <div className="finsight-form-row">
+          <label className="finsight-form-label">Monthly income (₹)</label>
           <input
             className="finsight-input"
             value={form.monthly_income}
@@ -108,24 +98,21 @@ export default function Register() {
             onChange={(e) => setForm({ ...form, monthly_income: e.target.value })}
             required
           />
-        </label>
-
-        <label style={{ display: "grid", gap: "6px" }}>
-          <span style={labelStyle}>Password</span>
+        </div>
+        <div className="finsight-form-row">
+          <label className="finsight-form-label">Password</label>
           <input
             className="finsight-input"
             value={form.password}
             type="password"
             placeholder="Min 8 chars, upper, lower, number, special"
             autoComplete="new-password"
-            title="Min 8 characters, at least one uppercase, lowercase, number, and special character"
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
           />
-        </label>
-
-        <label style={{ display: "grid", gap: "6px" }}>
-          <span style={labelStyle}>Confirm password</span>
+        </div>
+        <div className="finsight-form-row">
+          <label className="finsight-form-label">Confirm password</label>
           <input
             className="finsight-input"
             value={form.confirmPassword}
@@ -135,22 +122,24 @@ export default function Register() {
             onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
             required
           />
-        </label>
+        </div>
 
         {error && (
-          <div className="finsight-alert-banner" style={{ marginBottom: 0, padding: "10px 14px" }}>
-            <span className="finsight-alert-icon">⚠️</span>
-            <div className="finsight-alert-text" style={{ fontSize: "12px" }}>{error}</div>
+          <div className="finsight-alert-banner deficit" style={{ marginBottom: 0, padding: "12px 16px" }}>
+            <span>{error}</span>
           </div>
         )}
 
-        <button type="submit" className="finsight-btn finsight-btn-primary" disabled={isSubmitting} style={{ padding: "12px" }}>
+        <button type="submit" className="finsight-btn finsight-btn-black" disabled={isSubmitting} style={{ width: "100%", padding: "14px 16px", marginTop: "4px" }}>
           {isSubmitting ? "Creating account…" : "Create account"}
         </button>
       </form>
 
-      <p style={{ marginTop: "20px", fontSize: "12px", color: "var(--finsight-muted)" }}>
-        Already have an account? <Link to="/login" style={{ color: "var(--finsight-accent)" }}>Sign in</Link>
+      <p style={{ marginTop: "28px", fontSize: "0.9375rem", color: "var(--finsight-muted)", textAlign: "center" }}>
+        Already have an account?{" "}
+        <Link to="/login" style={{ color: "var(--fs-green)", fontWeight: 600, textDecoration: "none" }}>
+          Sign in
+        </Link>
       </p>
     </div>
   );

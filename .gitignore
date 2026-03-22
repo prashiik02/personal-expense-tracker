@@ -1,8 +1,8 @@
 .env
+**/.env
 # Node / frontend
 node_modules/
 dist/
-.env
 .DS_Store
 
 # Python / backend
@@ -12,7 +12,7 @@ venv/
 .venv/
 backend/.data/
 backend/*.db
-backend/instance/
+backend/instance/*.db
 backend/.uploads/
 
 

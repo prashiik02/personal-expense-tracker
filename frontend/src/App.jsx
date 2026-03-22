@@ -1,33 +1,41 @@
 import React, { useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Categorize from "./pages/Categorize";
 import Assistant from "./pages/Assistant";
 import Navbar from "./components/Navbar";
+import PublicNavbar from "./components/PublicNavbar";
 import { useAuth } from "./hooks/useAuth";
-import ThemeToggle from "./components/ThemeToggle";
 
-function App() {
+export default function App() {
   const { user } = useAuth();
+  const location = useLocation();
+  const isAuthPage = ["/login", "/register"].includes(location.pathname);
 
   useEffect(() => {
     document.body.classList.add("finsight");
     return () => document.body.classList.remove("finsight");
   }, []);
 
+  const mainClass = user
+    ? "finsight-app"
+    : isAuthPage
+      ? "finsight-app finsight-auth-wrap"
+      : "finsight-app finsight-app-full";
+
   return (
     <>
-      {user && <Navbar />}
-      {!user && (
-        <div style={{ position: "fixed", top: 16, right: 16, zIndex: 5 }}>
-          <ThemeToggle />
-        </div>
+      {user ? (
+        <Navbar />
+      ) : (
+        <PublicNavbar />
       )}
-      <main className={user ? "finsight-app" : "finsight-app finsight-auth-wrap"}>
+      <main className={mainClass}>
         <Routes>
-          <Route path="/" element={user ? <Dashboard /> : <Navigate to="/login" />} />
+          <Route path="/" element={user ? <Dashboard /> : <Landing />} />
           <Route path="/categorize" element={user ? <Categorize /> : <Navigate to="/login" />} />
           <Route path="/assistant" element={user ? <Assistant /> : <Navigate to="/login" />} />
           <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
@@ -39,5 +47,3 @@ function App() {
     </>
   );
 }
-
-export default App;

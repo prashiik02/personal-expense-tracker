@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getIncomeAdvice } from "../api/assistantApi";
+import RichAdviceText from "./RichAdviceText";
 
 function formatINR(n) {
   if (typeof n !== "number" || Number.isNaN(n)) return "-";
@@ -26,7 +27,7 @@ export default function IncomeAdviceCard({ month }) {
 
   return (
     <div>
-      <div className="finsight-card-title" style={{ marginBottom: "12px" }}>Income vs spending</div>
+      <div className="finsight-card-title">Income vs spending</div>
       {loading ? (
         <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>Loading advice…</p>
       ) : error ? (
@@ -35,16 +36,29 @@ export default function IncomeAdviceCard({ month }) {
         <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>{incomeAdvice.message}</p>
       ) : incomeAdvice?.advice ? (
         <>
-          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "12px", fontSize: "12px" }}>
-            <span>Income: <strong>₹{formatINR(incomeAdvice.monthly_income)}</strong></span>
-            <span>Spend ({incomeAdvice.month ?? "month"}): <strong>₹{formatINR(incomeAdvice.monthly_spend)}</strong></span>
-            <span style={{ color: incomeAdvice.surplus >= 0 ? "var(--finsight-success)" : "var(--finsight-danger)" }}>
-              {incomeAdvice.surplus >= 0 ? "Surplus" : "Overspend"}: <strong>₹{formatINR(Math.abs(incomeAdvice.surplus))}</strong>
-            </span>
+          <p className="finsight-income-section-hint">
+            Uses profile income and spend for <strong>{incomeAdvice.month ?? "the selected month"}</strong> (not all-time totals).
+          </p>
+          <div className="finsight-stat-chips">
+            <div className="finsight-stat-chip">
+              <span className="finsight-stat-chip-label">Monthly income (reference)</span>
+              <span className="finsight-stat-chip-value">₹{formatINR(incomeAdvice.monthly_income)}</span>
+            </div>
+            <div className="finsight-stat-chip">
+              <span className="finsight-stat-chip-label">Spend in {incomeAdvice.month ?? "month"}</span>
+              <span className="finsight-stat-chip-value">₹{formatINR(incomeAdvice.monthly_spend)}</span>
+            </div>
+            <div className="finsight-stat-chip">
+              <span className="finsight-stat-chip-label">{incomeAdvice.surplus >= 0 ? "Surplus" : "Overspend"}</span>
+              <span
+                className="finsight-stat-chip-value"
+                style={{ color: incomeAdvice.surplus >= 0 ? "var(--finsight-success)" : "var(--finsight-danger)" }}
+              >
+                ₹{formatINR(Math.abs(incomeAdvice.surplus))}
+              </span>
+            </div>
           </div>
-          <div style={{ fontSize: "12px", whiteSpace: "pre-wrap", color: "var(--finsight-text)", lineHeight: 1.5 }}>
-            {incomeAdvice.advice}
-          </div>
+          <RichAdviceText text={incomeAdvice.advice} />
         </>
       ) : incomeAdvice && !incomeAdvice.advice ? (
         <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>No advice available for this period.</p>

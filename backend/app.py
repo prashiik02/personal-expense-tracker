@@ -19,12 +19,17 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # Allow frontend (Vite dev: localhost:5173 / 127.0.0.1:5173) to call this API
+    # Allow frontend (Vite dev) to call this API
     # With supports_credentials=True, origins cannot be "*"; list explicit origins.
     CORS(
         app,
         resources={r"/*": {
-            "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+            "origins": [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:5174",
+                "http://127.0.0.1:5174",
+            ],
             "allow_headers": ["Content-Type", "Authorization"],
             "expose_headers": ["Content-Type"],
         }},

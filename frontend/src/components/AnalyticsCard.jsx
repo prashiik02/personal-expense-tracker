@@ -27,7 +27,7 @@ export default function AnalyticsCard({ icon, label, value, subtitle, trend, col
           <div style={{ fontSize: 12, color: "var(--finsight-muted)", fontWeight: 700, marginBottom: 8, letterSpacing: 0.2 }}>
             {label}
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "var(--finsight-text)", marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "var(--finsight-text)", marginBottom: 8, fontFamily: "inherit" }}>
             {value}
           </div>
           {subtitle && (

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { getTaxSuggestions } from "../api/assistantApi";
+import RichAdviceText from "./RichAdviceText";
 
 export default function TaxSuggestions() {
   const [loading, setLoading] = useState(false);
@@ -19,7 +20,7 @@ export default function TaxSuggestions() {
 
   return (
     <div>
-      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Tax Saving Suggestions</div>
+      <div className="finsight-card-title">Tax suggestions</div>
       <button type="button" className="finsight-btn finsight-btn-primary" onClick={fetch} disabled={loading}>{loading ? "Thinking…" : "Get Suggestions"}</button>
       {suggestions?.error && (
         <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", border: "1px solid var(--finsight-danger)", color: "var(--finsight-danger)" }}>
@@ -29,21 +30,35 @@ export default function TaxSuggestions() {
       {suggestions && !suggestions.error && (
         <div style={{ marginTop: "16px" }}>
           <div style={{ fontSize: "10px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Suggestions</div>
-          <div style={{ padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", border: "1px solid var(--finsight-border)", lineHeight: 1.6 }}>
+          <div className="finsight-tax-suggestions-box" style={{ padding: "14px 16px", background: "var(--finsight-surface2)", borderRadius: "10px", border: "1px solid var(--finsight-border)" }}>
             {typeof suggestions === "string" ? (
-              <div style={{ whiteSpace: "pre-wrap" }}>{suggestions}</div>
+              <RichAdviceText text={suggestions} />
             ) : Array.isArray(suggestions) ? (
-              <ul style={{ margin: 0, paddingLeft: "20px" }}>
-                {suggestions.map((s, i) => <li key={i}>{typeof s === "string" ? s : s?.text || String(s)}</li>)}
-              </ul>
+              <div className="finsight-stacked-advice">
+                {suggestions.map((s, i) => {
+                  const raw = typeof s === "string" ? s : s?.text || String(s);
+                  return (
+                    <div key={i} className="finsight-stacked-advice-item">
+                      <RichAdviceText text={raw} />
+                    </div>
+                  );
+                })}
+              </div>
             ) : Array.isArray(suggestions?.suggestions) ? (
-              <ul style={{ margin: 0, paddingLeft: "20px" }}>
-                {suggestions.suggestions.map((s, i) => <li key={i}>{typeof s === "string" ? s : s?.text || String(s)}</li>)}
-              </ul>
+              <div className="finsight-stacked-advice">
+                {suggestions.suggestions.map((s, i) => {
+                  const raw = typeof s === "string" ? s : s?.text || String(s);
+                  return (
+                    <div key={i} className="finsight-stacked-advice-item">
+                      <RichAdviceText text={raw} />
+                    </div>
+                  );
+                })}
+              </div>
             ) : suggestions?.suggestions && typeof suggestions.suggestions === "string" ? (
-              <div style={{ whiteSpace: "pre-wrap" }}>{suggestions.suggestions}</div>
+              <RichAdviceText text={suggestions.suggestions} />
             ) : (
-              <div style={{ whiteSpace: "pre-wrap" }}>{String(suggestions)}</div>
+              <RichAdviceText text={String(suggestions)} />
             )}
           </div>
         </div>

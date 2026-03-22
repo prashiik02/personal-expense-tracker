@@ -30,15 +30,13 @@ export default function Login() {
   };
 
   return (
-    <div className="finsight-card" style={{ maxWidth: 420, width: "100%" }}>
-      <div style={{ marginBottom: "24px" }}>
-        <div className="finsight-logo" style={{ fontSize: "24px", marginBottom: "4px" }}>Fin<span>Sight</span></div>
-        <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>Sign in to your account</p>
-      </div>
+    <div className="finsight-auth-card">
+      <h1 className="finsight-auth-title">Welcome back</h1>
+      <p className="finsight-auth-subtitle">Sign in to your account</p>
 
-      <form onSubmit={handleSubmit} style={{ display: "grid", gap: "16px" }}>
-        <label style={{ display: "grid", gap: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Email</span>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div className="finsight-form-row">
+          <label className="finsight-form-label">Email address</label>
           <input
             className="finsight-input"
             value={form.email}
@@ -47,10 +45,9 @@ export default function Login() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-        </label>
-
-        <label style={{ display: "grid", gap: "6px" }}>
-          <span style={{ fontSize: "11px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px" }}>Password</span>
+        </div>
+        <div className="finsight-form-row">
+          <label className="finsight-form-label">Password</label>
           <input
             className="finsight-input"
             value={form.password}
@@ -60,22 +57,24 @@ export default function Login() {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
           />
-        </label>
+        </div>
 
         {error && (
-          <div className="finsight-alert-banner" style={{ marginBottom: 0, padding: "10px 14px" }}>
-            <span className="finsight-alert-icon">⚠️</span>
-            <div className="finsight-alert-text" style={{ fontSize: "12px" }}>{error}</div>
+          <div className="finsight-alert-banner deficit" style={{ marginBottom: 0, padding: "12px 16px" }}>
+            <span>{error}</span>
           </div>
         )}
 
-        <button type="submit" className="finsight-btn finsight-btn-primary" disabled={isSubmitting} style={{ padding: "12px" }}>
+        <button type="submit" className="finsight-btn finsight-btn-black" disabled={isSubmitting} style={{ width: "100%", padding: "14px 16px", marginTop: "4px" }}>
           {isSubmitting ? "Signing in…" : "Sign in"}
         </button>
       </form>
 
-      <p style={{ marginTop: "20px", fontSize: "12px", color: "var(--finsight-muted)" }}>
-        New here? <Link to="/register" style={{ color: "var(--finsight-accent)" }}>Create an account</Link>
+      <p style={{ marginTop: "28px", fontSize: "0.9375rem", color: "var(--finsight-muted)", textAlign: "center" }}>
+        New here?{" "}
+        <Link to="/register" style={{ color: "var(--fs-green)", fontWeight: 600, textDecoration: "none" }}>
+          Create an account
+        </Link>
       </p>
     </div>
   );

@@ -3,6 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import { fetchDashboardOverview, fetchTransactions, excludeTransactionFromAnalysis } from "../api/statementApi";
 import { getIncomeAdvice } from "../api/assistantApi";
 import { Link } from "react-router-dom";
+import RichAdviceText from "../components/RichAdviceText";
 import {
   ResponsiveContainer,
   LineChart,
@@ -19,8 +20,8 @@ import {
   Bar,
 } from "recharts";
 
-const CHART_COLORS = ["#7c6af7", "#4ad8a0", "#f7c26a", "#f7706a", "#9b8cf9", "#6ae0f7", "#f7907a", "#c4b5fd"];
-const PIE_COLORS = ["#7c6af7", "#4ad8a0", "#f7c26a", "#f7706a", "#9b8cf9", "#6ae0f7"];
+const CHART_COLORS = ["#166534", "#ca8a04", "#475569", "#7c3aed", "#b91c1c", "#0d9488", "#a16207", "#4f46e5"];
+const PIE_COLORS = ["#166534", "#ca8a04", "#475569", "#7c3aed", "#b91c1c", "#0d9488"];
 
 function formatINR(n) {
   if (typeof n !== "number" || Number.isNaN(n)) return "-";
@@ -112,27 +113,39 @@ export default function Dashboard() {
     });
   }, [data]);
 
-  const categoryData = useMemo(() => {
-    const months = data?.time_aggregates?.by_month || [];
-    if (months.length === 0) return {};
-    const latest = months[months.length - 1];
-    const cats = latest?.categories || {};
-    const result = {};
-    Object.entries(cats).forEach(([key, val]) => {
-      result[key] = val?.total ?? 0;
-    });
-    return result;
-  }, [data]);
+  /** e.g. "February 2025" — latest month that has transaction data */
+  const latestMonthFormatted = useMemo(() => {
+    if (!latestMonth) return null;
+    try {
+      const d = new Date(`${latestMonth}-01`);
+      return d.toLocaleString("en-IN", { month: "long", year: "numeric" });
+    } catch {
+      return latestMonth;
+    }
+  }, [latestMonth]);
 
+  /** Total spend in that latest calendar month only */
+  const latestMonthSpend = useMemo(() => {
+    if (!monthlySeries.length) return 0;
+    const last = monthlySeries[monthlySeries.length - 1];
+    return Number(last?.total) || 0;
+  }, [monthlySeries]);
+
+  // Aggregate categories across ALL months so charts match KPI totals (all-time)
   const categoryListWithCount = useMemo(() => {
     const months = data?.time_aggregates?.by_month || [];
-    if (months.length === 0) return [];
-    const latest = months[months.length - 1];
-    const cats = latest?.categories || {};
-    return Object.entries(cats)
-      .map(([key, val]) => ({ key, total: val?.total ?? 0, count: val?.count ?? 0 }))
+    const merged = {};
+    months.forEach((m) => {
+      Object.entries(m?.categories || {}).forEach(([key, val]) => {
+        if (!merged[key]) merged[key] = { total: 0, count: 0 };
+        merged[key].total += val?.total ?? 0;
+        merged[key].count += val?.count ?? 0;
+      });
+    });
+    return Object.entries(merged)
+      .map(([key, val]) => ({ key, total: val.total, count: val.count }))
       .sort((a, b) => b.total - a.total)
-      .slice(0, 8);
+      .slice(0, 10);
   }, [data]);
 
   const pieData = useMemo(() => {
@@ -149,8 +162,21 @@ export default function Dashboard() {
   const referenceIncome = data?.monthly_income != null && Number(data.monthly_income) > 0 ? Number(data.monthly_income) : null;
   const totalIncome = referenceIncome != null ? referenceIncome : totalIncomeFromTxns;
   const net = totalIncome - totalSpend;
-  const catTotal = categoryListWithCount.reduce((s, c) => s + c.total, 0);
-  const maxCat = Math.max(...categoryListWithCount.map((c) => c.total), 1);
+  const topCategoryLabel =
+    categoryListWithCount.length > 0
+      ? (categoryListWithCount[0].key.split(" > ")[0] || categoryListWithCount[0].key)
+      : "—";
+
+  const memberSinceLabel = useMemo(() => {
+    const first = data?.time_aggregates?.by_month?.[0]?.period;
+    if (!first || first.length < 7) return null;
+    try {
+      const d = new Date(`${first}-01`);
+      return d.toLocaleString("en-IN", { month: "long", year: "numeric" });
+    } catch {
+      return null;
+    }
+  }, [data]);
 
   if (!user) {
     return (
@@ -163,49 +189,77 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Header */}
-      <header className="finsight-header">
+      <header className="finsight-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
         <div>
-          <div style={{ fontSize: "11px", color: "var(--finsight-muted)", marginTop: "4px" }}>
-            Personal Finance Intelligence
-          </div>
+          <h1 className="finsight-header-title">Dashboard</h1>
+          <p className="finsight-header-subtitle">
+            {data ? (
+              <>
+                {data.transactions_count ?? 0} transactions · All-time spend <strong>₹{formatINR(totalSpend)}</strong>
+                {latestMonthFormatted ? (
+                  <> · Latest month in data: <strong>{latestMonthFormatted}</strong></>
+                ) : null}
+              </>
+            ) : (
+              "Your financial overview"
+            )}
+          </p>
         </div>
-        <div className="finsight-header-meta">
-          {data && (
-            <>
-              Parsed: {data.transactions_count ?? 0} transactions
-              {latestMonth && (
-                <div className="finsight-period-badge">📅 {latestMonth}</div>
-              )}
-            </>
-          )}
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={loading}
-            className="finsight-btn"
-            style={{ marginTop: "8px" }}
-          >
-            {loading ? "Loading…" : "Refresh"}
-          </button>
-        </div>
+        <button type="button" onClick={handleRefresh} disabled={loading} className="finsight-btn">
+          {loading ? "Loading…" : "Refresh"}
+        </button>
       </header>
 
       {error && (
-        <div className="finsight-alert-banner" style={{ borderColor: "var(--finsight-danger)" }}>
-          <span className="finsight-alert-icon">⚠️</span>
+        <div className="finsight-alert-banner deficit">
           <div className="finsight-alert-text">{error}</div>
         </div>
       )}
 
       {data && !loading && (
         <>
+          <div className="finsight-card finsight-profile-card">
+            <div className="finsight-profile-avatar" aria-hidden>
+              {(user?.name || user?.email || "?").charAt(0).toUpperCase()}
+            </div>
+            <div className="finsight-profile-meta">
+              <h2>{user?.name || "Account"}</h2>
+              <p>{user?.email}</p>
+              {memberSinceLabel && (
+                <span className="finsight-profile-badge">Member since {memberSinceLabel}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="finsight-spend-summary" aria-label="Spending summary">
+            <div className="finsight-spend-summary-card">
+              <div className="finsight-spend-summary-label">Month &amp; year (latest data)</div>
+              <div className="finsight-spend-summary-main">
+                {latestMonthFormatted ? (
+                  <>
+                    <span className="finsight-spend-summary-period">{latestMonthFormatted}</span>
+                    <span className="finsight-spend-summary-sub">Spend this month</span>
+                    <span className="finsight-spend-summary-amount">₹{formatINR(latestMonthSpend)}</span>
+                  </>
+                ) : (
+                  <span className="finsight-spend-summary-empty">No monthly data yet</span>
+                )}
+              </div>
+            </div>
+            <div className="finsight-spend-summary-card finsight-spend-summary-card--wide">
+              <div className="finsight-spend-summary-label">All-time spending</div>
+              <div className="finsight-spend-summary-main">
+                <span className="finsight-spend-summary-amount finsight-spend-summary-amount--lg">₹{formatINR(totalSpend)}</span>
+                <span className="finsight-spend-summary-sub">Across all recorded months</span>
+              </div>
+            </div>
+          </div>
+
           {/* Alert: deficit/surplus — uses reference monthly income when set */}
           {totalSpend > 0 && (
             <div className={`finsight-alert-banner ${net < 0 ? "deficit" : "surplus"}`}>
-              <span className="finsight-alert-icon">{net < 0 ? "⚠️" : "✓"}</span>
               <div className="finsight-alert-text">
-                You spent <strong>₹{formatINR(totalSpend)}</strong> this period.
+                You spent <strong>₹{formatINR(totalSpend)}</strong> all time.
                 {referenceIncome != null ? (
                   <> Your monthly income (reference) is <strong>₹{formatINR(totalIncome)}</strong>. </>
                 ) : (
@@ -220,54 +274,38 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Income vs spending – personalized advice */}
-          <div className="finsight-card" style={{ marginBottom: "20px" }}>
-            <div className="finsight-card-title">Income vs spending</div>
-            {loadingIncomeAdvice ? (
-              <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>Loading advice…</p>
-            ) : incomeAdvice?.message ? (
-              <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>{incomeAdvice.message}</p>
-            ) : incomeAdvice?.advice ? (
-              <>
-                <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "12px", fontSize: "12px" }}>
-                  <span>Income: <strong>₹{formatINR(incomeAdvice.monthly_income)}</strong></span>
-                  <span>Spend ({incomeAdvice.month ?? "month"}): <strong>₹{formatINR(incomeAdvice.monthly_spend)}</strong></span>
-                  <span style={{ color: incomeAdvice.surplus >= 0 ? "var(--finsight-success)" : "var(--finsight-danger)" }}>
-                    {incomeAdvice.surplus >= 0 ? "Surplus" : "Overspend"}: <strong>₹{formatINR(Math.abs(incomeAdvice.surplus))}</strong>
-                  </span>
-                </div>
-                <div style={{ fontSize: "12px", whiteSpace: "pre-wrap", color: "var(--finsight-text)", lineHeight: 1.5 }}>
-                  {incomeAdvice.advice}
-                </div>
-              </>
-            ) : incomeAdvice && !incomeAdvice.advice ? (
-              <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>No advice available for this period.</p>
-            ) : null}
-          </div>
-
-          {/* KPI Grid — Total Income from analysis (reference monthly income when set) */}
           <div className="finsight-kpi-grid">
-            <div className="finsight-kpi-card income">
-              <div className="finsight-kpi-label">Total Income</div>
-              <div className="finsight-kpi-value">₹{formatINR(totalIncome)}</div>
-              <div className="finsight-kpi-sub">
-                {referenceIncome != null ? "From your profile (reference)" : `${data.transactions_count ?? 0} transactions`}
-              </div>
-            </div>
             <div className="finsight-kpi-card spend">
-              <div className="finsight-kpi-label">Total Spent</div>
+              <div className="finsight-kpi-label">Total spent</div>
               <div className="finsight-kpi-value">₹{formatINR(totalSpend)}</div>
-              <div className="finsight-kpi-sub">Across {categoryListWithCount.length} categories</div>
-            </div>
-            <div className={`finsight-kpi-card net ${net >= 0 ? "surplus" : "deficit"}`}>
-              <div className="finsight-kpi-label">Net Balance</div>
-              <div className="finsight-kpi-value">{net >= 0 ? "₹" + formatINR(net) : "-₹" + formatINR(-net)}</div>
-              <div className="finsight-kpi-sub">{net >= 0 ? "Surplus" : "Deficit"}</div>
+              <div className="finsight-kpi-sub">All time</div>
             </div>
             <div className="finsight-kpi-card txn">
               <div className="finsight-kpi-label">Transactions</div>
               <div className="finsight-kpi-value">{data.transactions_count ?? 0}</div>
-              <div className="finsight-kpi-sub">This period</div>
+              <div className="finsight-kpi-sub">All time</div>
+            </div>
+            <div className="finsight-kpi-card">
+              <div className="finsight-kpi-label">Top category</div>
+              <div className="finsight-kpi-value" style={{ fontSize: "1.35rem" }}>
+                {topCategoryLabel}
+              </div>
+              <div className="finsight-kpi-sub">By spend</div>
+            </div>
+          </div>
+
+          <div className="finsight-kpi-grid finsight-kpi-grid-2" style={{ marginTop: "-8px" }}>
+            <div className="finsight-kpi-card income">
+              <div className="finsight-kpi-label">Monthly income</div>
+              <div className="finsight-kpi-value">₹{formatINR(totalIncome)}</div>
+              <div className="finsight-kpi-sub">
+                {referenceIncome != null ? "From your profile" : "From transactions"}
+              </div>
+            </div>
+            <div className={`finsight-kpi-card net ${net >= 0 ? "surplus" : "deficit"}`}>
+              <div className="finsight-kpi-label">Net balance</div>
+              <div className="finsight-kpi-value">{net >= 0 ? "₹" + formatINR(net) : "-₹" + formatINR(-net)}</div>
+              <div className="finsight-kpi-sub">{net >= 0 ? "Surplus vs income" : "Deficit"}</div>
             </div>
           </div>
 
@@ -275,30 +313,31 @@ export default function Dashboard() {
           <div className="finsight-main-grid">
             <div className="finsight-card finsight-chart-card">
               <div className="finsight-card-title">Spending by Category</div>
+              <p style={{ fontSize: "12px", color: "var(--finsight-muted)", marginBottom: "12px", marginTop: "-8px" }}>All time · Top 10 categories</p>
               {categoryListWithCount.length === 0 ? (
-                <p className="finsight-chart-empty">No spending data for latest month.</p>
+                <p className="finsight-chart-empty">No spending data yet.</p>
               ) : (
                 <div className="finsight-bar-chart-wrap">
-                  <ResponsiveContainer width="100%" height={Math.max(200, categoryListWithCount.length * 48)}>
+                  <ResponsiveContainer width="100%" height={Math.max(220, categoryListWithCount.length * 40)}>
                     <BarChart
                       data={categoryListWithCount.map((item, i) => ({
-                        name: item.key.length > 32 ? item.key.slice(0, 30) + "…" : item.key,
+                        name: item.key.length > 28 ? item.key.slice(0, 26) + "…" : item.key,
                         fullName: item.key,
                         value: item.total,
                         count: item.count,
                         fill: CHART_COLORS[i % CHART_COLORS.length],
                       }))}
                       layout="vertical"
-                      margin={{ top: 8, right: 16, left: 4, bottom: 8 }}
+                      margin={{ top: 8, right: 55, left: 4, bottom: 8 }}
                     >
-                      <XAxis type="number" hide />
-                      <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11, fill: "var(--finsight-muted)" }} axisLine={false} tickLine={false} />
+                      <XAxis type="number" tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000) + "k" : v}`} tick={{ fontSize: 11, fill: "var(--finsight-muted)" }} axisLine={false} tickLine={false} width={50} />
+                      <YAxis type="category" dataKey="name" width={180} tick={{ fontSize: 12, fill: "var(--finsight-text)" }} axisLine={false} tickLine={false} />
                       <Tooltip
                         contentStyle={{ background: "var(--finsight-surface2)", border: "1px solid var(--finsight-border)", borderRadius: "10px" }}
                         formatter={(v) => [`₹${formatINR(v)}`, "Spent"]}
                         labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName}
                       />
-                      <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={32} />
+                      <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={36} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -307,6 +346,7 @@ export default function Dashboard() {
 
             <div className="finsight-card finsight-chart-card">
               <div className="finsight-card-title">Spend Distribution</div>
+              <p style={{ fontSize: "12px", color: "var(--finsight-muted)", marginBottom: "12px", marginTop: "-8px" }}>All time</p>
               {pieData.length > 0 ? (
                 <div className="finsight-donut-wrap">
                   <ResponsiveContainer width="100%" height={260}>
@@ -348,7 +388,7 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                   <div className="finsight-donut-total">
                     <span className="finsight-donut-total-label">Total spend</span>
-                    <span className="finsight-donut-total-value">₹{formatINR(catTotal)}</span>
+                    <span className="finsight-donut-total-value">₹{formatINR(totalSpend)}</span>
                   </div>
                 </div>
               ) : (
@@ -437,12 +477,48 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="finsight-card" style={{ marginTop: "20px" }}>
-            <div className="finsight-card-title">Quick Actions</div>
+          <div className="finsight-card" style={{ marginTop: "24px" }}>
+            <div className="finsight-card-title">Income vs spending</div>
+            <p className="finsight-income-section-hint">
+              Figures below use your <strong>profile income</strong> and <strong>spend for one calendar month</strong> (not the same as &ldquo;Total spent&rdquo; all time in the KPIs above).
+            </p>
+            {loadingIncomeAdvice ? (
+              <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>Loading advice…</p>
+            ) : incomeAdvice?.message ? (
+              <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>{incomeAdvice.message}</p>
+            ) : incomeAdvice?.advice ? (
+              <>
+                <div className="finsight-stat-chips">
+                  <div className="finsight-stat-chip">
+                    <span className="finsight-stat-chip-label">Monthly income (reference)</span>
+                    <span className="finsight-stat-chip-value">₹{formatINR(incomeAdvice.monthly_income)}</span>
+                  </div>
+                  <div className="finsight-stat-chip">
+                    <span className="finsight-stat-chip-label">Spend in {incomeAdvice.month ?? "selected month"}</span>
+                    <span className="finsight-stat-chip-value">₹{formatINR(incomeAdvice.monthly_spend)}</span>
+                  </div>
+                  <div className="finsight-stat-chip">
+                    <span className="finsight-stat-chip-label">{incomeAdvice.surplus >= 0 ? "Surplus" : "Overspend"}</span>
+                    <span
+                      className="finsight-stat-chip-value"
+                      style={{ color: incomeAdvice.surplus >= 0 ? "var(--finsight-success)" : "var(--finsight-danger)" }}
+                    >
+                      ₹{formatINR(Math.abs(incomeAdvice.surplus))}
+                    </span>
+                  </div>
+                </div>
+                <RichAdviceText text={incomeAdvice.advice} />
+              </>
+            ) : incomeAdvice && !incomeAdvice.advice ? (
+              <p style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>No advice available for this period.</p>
+            ) : null}
+          </div>
+
+          <div className="finsight-card" style={{ marginTop: "24px" }}>
+            <div className="finsight-card-title">Quick actions</div>
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <Link to="/categorize" className="finsight-btn">🏷️ Categorize</Link>
-              <Link to="/assistant" className="finsight-btn">🤖 AI Assistant</Link>
+              <Link to="/categorize" className="finsight-btn">Categorize</Link>
+              <Link to="/assistant" className="finsight-btn">Assistant</Link>
             </div>
           </div>
         </>

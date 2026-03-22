@@ -434,7 +434,7 @@ class SmartCategorizationEngine:
                     predicted_category=llm_res.category,
                     predicted_subcategory=llm_res.subcategory,
                     confidence=llm_res.confidence,
-                    method="groq_llm",
+                    method="deepseek_llm",
                     merchant_record=None,
                     charge_type=None,
                     business_type=None,
@@ -497,7 +497,7 @@ class SmartCategorizationEngine:
                 result.predicted_category = llm_res.category
                 result.predicted_subcategory = llm_res.subcategory
                 result.confidence = llm_res.confidence
-                result.method = "groq_llm"
+                result.method = "deepseek_llm"
                 result.needs_review = llm_res.confidence < 0.70
                 result.tags = self._generate_tags(llm_res.category, llm_res.subcategory, None, amount)
 

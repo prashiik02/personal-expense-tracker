@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Optional, Dict, List, Tuple
 
 from ..data.taxonomy import CATEGORY_TAXONOMY, CATEGORY_ALIASES
-from .ollama_client import OllamaClient, OllamaError
+from .deepseek_json_client import DeepSeekJsonClient, DeepSeekJsonError
 
 
 @dataclass
@@ -83,13 +83,13 @@ def _candidate_categories(description: str, limit: int = 6) -> List[str]:
 
 class LLMCategorizer:
     """
-    Ollama-backed categorizer constrained to the existing taxonomy.
-    Intended as a fallback when ML confidence is low.
+    DeepSeek-backed categorizer constrained to the existing taxonomy.
+    Fallback when ML confidence is low or for PDF-only flows.
     """
 
     def __init__(self):
-        self.client = OllamaClient()
-        self.min_confidence = _env_float("OLLAMA_MIN_CONFIDENCE", 0.62)
+        self.client = DeepSeekJsonClient()
+        self.min_confidence = _env_float("LLM_MIN_CONFIDENCE", 0.62)
 
     def enabled(self) -> bool:
         return bool(self.client.enabled)
@@ -123,7 +123,7 @@ class LLMCategorizer:
 
         try:
             obj = self.client.generate_json(prompt, system=system, temperature=0.1)
-        except OllamaError:
+        except DeepSeekJsonError:
             return None
 
         cat = str(obj.get("category") or "").strip()

@@ -35,34 +35,39 @@ def categorize_single():
     except ValidationError as e:
         return jsonify({"error": e.errors()}), 400
 
-    pipeline = get_pipeline()
-    txn = Transaction(
-        transaction_id=data.transaction_id or "txn",
-        date=data.date,
-        description=data.description,
-        amount=data.amount,
-        currency=data.currency,
-        line_items=[li.model_dump() for li in (data.line_items or [])] or None,
-    )
-    result = pipeline.process(txn)
-    payload = result.to_dict()
+    try:
+        pipeline = get_pipeline()
+        txn = Transaction(
+            transaction_id=data.transaction_id or "txn",
+            date=data.date,
+            description=data.description,
+            amount=data.amount,
+            currency=data.currency,
+            line_items=[li.model_dump() for li in (data.line_items or [])] or None,
+        )
+        result = pipeline.process(txn)
+        payload = result.to_dict()
 
-    # Persist for this user (avoid duplicates)
-    user_id = int(get_jwt_identity())
-    record = TransactionRecord.from_processed(
-        user_id=user_id,
-        processed=payload,
-        source="manual",
-        bank=None,
-    )
-    exists = TransactionRecord.query.filter_by(
-        user_id=user_id, hash_key=record.hash_key
-    ).first()
-    if not exists:
-        db.session.add(record)
-        db.session.commit()
+        user_id = int(get_jwt_identity())
+        record = TransactionRecord.from_processed(
+            user_id=user_id,
+            processed=payload,
+            source="manual",
+            bank=None,
+        )
+        exists = TransactionRecord.query.filter_by(
+            user_id=user_id, hash_key=record.hash_key
+        ).first()
+        if not exists:
+            db.session.add(record)
+            db.session.commit()
 
-    return jsonify(payload), 200
+        return jsonify(payload), 200
+    except Exception as e:
+        msg = str(e)
+        if "API" in msg or "DeepSeek" in msg or "Gemini" in msg or "timeout" in msg.lower():
+            return jsonify({"error": f"LLM categorization failed: {msg}. Check your DEEPSEEK_API_KEY or GEMINI_API_KEY and network connectivity."}), 502
+        return jsonify({"error": msg}), 500
 
 
 @categorization_bp.route("/batch", methods=["POST"])
@@ -82,20 +87,20 @@ def categorize_batch():
     else:
         return _err("Provide either 'transactions' or 'csv_text'.", 400)
 
-    pipeline = get_pipeline()
-    processed = []
-
-    use_chunked = getattr(data, "use_llm_chunked", False)
     try:
-        has_llm = chunked_llm_available()
-        provider = get_chunked_provider() if has_llm else None
-    except Exception:
-        has_llm = False
-        provider = None
+        pipeline = get_pipeline()
+        processed = []
 
-    if use_chunked and has_llm and len(txns) > 0:
-        # Split data, categorize each chunk via Gemini/DeepSeek, merge and run enrichment.
-        txn_dicts = [
+        use_chunked = getattr(data, "use_llm_chunked", False)
+        try:
+            has_llm = chunked_llm_available()
+            provider = get_chunked_provider() if has_llm else None
+        except Exception:
+            has_llm = False
+            provider = None
+
+        if use_chunked and has_llm and len(txns) > 0:
+            txn_dicts = [
             {
                 "transaction_id": t.transaction_id or "txn",
                 "description": t.description,
@@ -103,64 +108,68 @@ def categorize_batch():
             }
             for t in txns
         ]
-        chunked_results = categorize_batch_via_llm_chunked(txn_dicts)
-        method = "gemini_chunked" if provider == "gemini" else "deepseek_chunked"
-        for t, res in zip(txns, chunked_results):
-            txn = Transaction(
-                transaction_id=t.transaction_id or "txn",
-                date=t.date,
-                description=t.description,
-                amount=t.amount,
-                currency=t.currency,
-                line_items=[li.model_dump() for li in (t.line_items or [])] or None,
-            )
-            processed.append(
-                pipeline.process_with_category(
-                    txn,
-                    category=res["category"],
-                    subcategory=res["subcategory"],
-                    confidence=res["confidence"],
-                    method=method,
+            chunked_results = categorize_batch_via_llm_chunked(txn_dicts)
+            method = "gemini_chunked" if provider == "gemini" else "deepseek_chunked"
+            for t, res in zip(txns, chunked_results):
+                txn = Transaction(
+                    transaction_id=t.transaction_id or "txn",
+                    date=t.date,
+                    description=t.description,
+                    amount=t.amount,
+                    currency=t.currency,
+                    line_items=[li.model_dump() for li in (t.line_items or [])] or None,
                 )
+                processed.append(
+                    pipeline.process_with_category(
+                        txn,
+                        category=res["category"],
+                        subcategory=res["subcategory"],
+                        confidence=res["confidence"],
+                        method=method,
+                    )
+                )
+        else:
+            for t in txns:
+                txn = Transaction(
+                    transaction_id=t.transaction_id or "txn",
+                    date=t.date,
+                    description=t.description,
+                    amount=t.amount,
+                    currency=t.currency,
+                    line_items=[li.model_dump() for li in (t.line_items or [])] or None,
+                )
+                processed.append(pipeline.process(txn, enable_llm_fallback=False))
+
+        processed_dicts = [p.to_dict() for p in processed]
+
+        user_id = int(get_jwt_identity())
+        for row in processed_dicts:
+            record = TransactionRecord.from_processed(
+                user_id=user_id,
+                processed=row,
+                source="csv" if data.csv_text else "batch",
+                bank=None,
             )
-    else:
-        for t in txns:
-            txn = Transaction(
-                transaction_id=t.transaction_id or "txn",
-                date=t.date,
-                description=t.description,
-                amount=t.amount,
-                currency=t.currency,
-                line_items=[li.model_dump() for li in (t.line_items or [])] or None,
-            )
-            processed.append(pipeline.process(txn, enable_llm_fallback=False))
+            exists = TransactionRecord.query.filter_by(
+                user_id=user_id, hash_key=record.hash_key
+            ).first()
+            if exists:
+                continue
+            db.session.add(record)
+        db.session.commit()
 
-    processed_dicts = [p.to_dict() for p in processed]
+        payload = {"count": len(processed)}
+        if data.return_results:
+            payload["results"] = processed_dicts
+        if data.include_summary:
+            payload["summary"] = pipeline.get_summary(processed)
 
-    # Persist all processed transactions for this user, deduplicated
-    user_id = int(get_jwt_identity())
-    for row in processed_dicts:
-        record = TransactionRecord.from_processed(
-            user_id=user_id,
-            processed=row,
-            source="csv" if data.csv_text else "batch",
-            bank=None,
-        )
-        exists = TransactionRecord.query.filter_by(
-            user_id=user_id, hash_key=record.hash_key
-        ).first()
-        if exists:
-            continue
-        db.session.add(record)
-    db.session.commit()
-
-    payload = {"count": len(processed)}
-    if data.return_results:
-        payload["results"] = processed_dicts
-    if data.include_summary:
-        payload["summary"] = pipeline.get_summary(processed)
-
-    return jsonify(payload), 200
+        return jsonify(payload), 200
+    except Exception as e:
+        msg = str(e)
+        if "API" in msg or "DeepSeek" in msg or "Gemini" in msg or "timeout" in msg.lower():
+            return jsonify({"error": f"LLM categorization failed: {msg}. Check your DEEPSEEK_API_KEY or GEMINI_API_KEY and network connectivity."}), 502
+        return jsonify({"error": msg}), 500
 
 
 @categorization_bp.route("/sms", methods=["POST"])
@@ -176,32 +185,37 @@ def categorize_sms():
     else:
         parsed = parse_sbi_sms(data.sms_text)
 
-    pipeline = get_pipeline()
-    txn = Transaction(
-        transaction_id="sms",
-        date=parsed["date"],
-        description=parsed["description"],
-        amount=parsed["amount"],
-    )
-    result = pipeline.process(txn)
-    result_dict = result.to_dict()
+    try:
+        pipeline = get_pipeline()
+        txn = Transaction(
+            transaction_id="sms",
+            date=parsed["date"],
+            description=parsed["description"],
+            amount=parsed["amount"],
+        )
+        result = pipeline.process(txn)
+        result_dict = result.to_dict()
 
-    # Persist SMS-sourced transaction
-    user_id = int(get_jwt_identity())
-    record = TransactionRecord.from_processed(
-        user_id=user_id,
-        processed=result_dict,
-        source="sms",
-        bank=data.bank,
-    )
-    exists = TransactionRecord.query.filter_by(
-        user_id=user_id, hash_key=record.hash_key
-    ).first()
-    if not exists:
-        db.session.add(record)
-        db.session.commit()
+        user_id = int(get_jwt_identity())
+        record = TransactionRecord.from_processed(
+            user_id=user_id,
+            processed=result_dict,
+            source="sms",
+            bank=data.bank,
+        )
+        exists = TransactionRecord.query.filter_by(
+            user_id=user_id, hash_key=record.hash_key
+        ).first()
+        if not exists:
+            db.session.add(record)
+            db.session.commit()
 
-    return jsonify({"parsed": parsed, "result": result_dict}), 200
+        return jsonify({"parsed": parsed, "result": result_dict}), 200
+    except Exception as e:
+        msg = str(e)
+        if "API" in msg or "DeepSeek" in msg or "Gemini" in msg or "timeout" in msg.lower():
+            return jsonify({"error": f"LLM categorization failed: {msg}. Check your DEEPSEEK_API_KEY or GEMINI_API_KEY and network connectivity."}), 502
+        return jsonify({"error": msg}), 500
 
 
 @categorization_bp.route("/correction", methods=["POST"])

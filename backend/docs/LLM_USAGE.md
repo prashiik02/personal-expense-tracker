@@ -43,7 +43,7 @@ So for a long PDF you get **one LLM call per chunk** (Gemini preferred when `GEM
 
 ## 4. **Smart categorization engine** (`smart_categorization/core/categorizer.py`)
 
-- **LLM categorizer** (`llm_categorizer.py`) uses `OllamaClient` (DeepSeek under the hood).
+- **LLM categorizer** (`llm_categorizer.py`) uses `DeepSeekJsonClient` (DeepSeek Chat Completions with JSON mode).
 - It is invoked when:
   - `use_llm_only=True` (e.g. PDF flow – now we set `enable_llm_fallback=False` for PDF categorization so this path is no longer used for PDF rows), or
   - `enable_llm_fallback=True` and ML confidence < threshold and no merchant DB match → one `llm.categorize(description, amount)` per transaction.
@@ -55,7 +55,7 @@ So for a long PDF you get **one LLM call per chunk** (Gemini preferred when `GEM
 | Function | Used by | Purpose |
 |----------|---------|---------|
 | `parse_bank_statement_with_llm(raw_text)` | `statements/routes.py` (PDF analyze) | Single call to extract list of transactions from raw statement text when regex/table parsing is weak. |
-| `categorize_transaction_with_llm(narration)` | Not used by the main app; only by `test_groq.py` | Categorize a single narration via LLM. |
+| `categorize_transaction_with_llm(narration)` | Not used by the main app; only by `test_llm_fallback.py` (manual smoke test) | Categorize a single narration via LLM. |
 
 ---
 

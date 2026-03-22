@@ -1,8 +1,18 @@
-import React, { useState } from "react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import React, { useState, useMemo } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  Cell,
+} from "recharts";
 import { generateBudget } from "../api/assistantApi";
+import RichAdviceText from "./RichAdviceText";
 
-const CHART_COLORS = ["#7c6af7", "#4ad8a0", "#f7c26a", "#f7706a", "#9b8cf9", "#6ae0f7", "#f7907a", "#c4b5fd"];
+const CHART_COLORS = ["#166534", "#ca8a04", "#475569", "#7c3aed", "#b91c1c", "#0d9488", "#a16207", "#4f46e5"];
 
 function formatINR(n) {
   if (typeof n !== "number" || Number.isNaN(n)) return "—";
@@ -12,6 +22,7 @@ function formatINR(n) {
 export default function BudgetGenerator() {
   const [loading, setLoading] = useState(false);
   const [budget, setBudget] = useState(null);
+
   async function createBudget() {
     setLoading(true);
     setBudget(null);
@@ -30,75 +41,157 @@ export default function BudgetGenerator() {
   const totalBudget = hasBudgets
     ? Object.values(budget.budgets).reduce((s, v) => s + (Number(v) || 0), 0)
     : 0;
-  const pieData = hasBudgets
-    ? Object.entries(budget.budgets)
-        .filter(([, amt]) => Number(amt) > 0)
-        .map(([name, value], i) => ({ name, value: Number(value), fill: CHART_COLORS[i % CHART_COLORS.length] }))
-    : [];
+
+  const barData = useMemo(() => {
+    if (!hasBudgets) return [];
+    return Object.entries(budget.budgets)
+      .filter(([, amt]) => Number(amt) > 0)
+      .map(([name, value], i) => ({
+        name: name.length > 36 ? `${name.slice(0, 34)}…` : name,
+        fullName: name,
+        value: Number(value),
+        fill: CHART_COLORS[i % CHART_COLORS.length],
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [budget, hasBudgets]);
 
   return (
     <div>
-      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Smart Budget</div>
-      <p style={{ fontSize: "11px", color: "var(--finsight-muted)", marginBottom: "12px" }}>
-        Uses your monthly income and last 3 months’ spending to suggest a category-wise budget (INR).
+      <div className="finsight-card-title">Budget</div>
+      <p style={{ fontSize: "0.9375rem", color: "var(--finsight-muted)", marginBottom: "16px", lineHeight: 1.5 }}>
+        Uses your monthly income and last 3 months&apos; spending to suggest a category-wise budget.
       </p>
       <button type="button" className="finsight-btn finsight-btn-primary" onClick={createBudget} disabled={loading}>
         {loading ? "Working…" : "Generate Budget"}
       </button>
 
       {budget?.error && (
-        <div style={{ marginTop: "16px", padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", border: "1px solid var(--finsight-danger)", color: "var(--finsight-danger)" }}>
+        <div
+          style={{
+            marginTop: "16px",
+            padding: "12px 16px",
+            background: "var(--finsight-surface2)",
+            borderRadius: "8px",
+            fontSize: "0.875rem",
+            border: "1px solid var(--finsight-danger)",
+            color: "var(--finsight-danger)",
+          }}
+        >
           {budget.error}
         </div>
       )}
 
       {budget && !budget.error && (
-        <div style={{ marginTop: "16px" }}>
+        <div style={{ marginTop: "20px" }}>
           {hasBudgets && (
             <>
-              <div style={{ fontSize: "10px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Budget breakdown</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", alignItems: "start" }}>
-                <div style={{ minHeight: 220 }}>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {pieData.map((entry, i) => (
-                          <Cell key={i} fill={entry.fill} />
+              <div
+                style={{
+                  fontSize: "0.6875rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--finsight-muted)",
+                  marginBottom: "12px",
+                }}
+              >
+                Budget breakdown
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <div className="finsight-budget-chart-wrap" style={{ minHeight: Math.max(200, barData.length * 36) }}>
+                  <ResponsiveContainer width="100%" height={Math.max(200, barData.length * 36)}>
+                    <BarChart
+                      data={barData}
+                      layout="vertical"
+                      margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--finsight-border)" />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : v}`}
+                        tick={{ fontSize: 11, fill: "var(--finsight-muted)" }}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={130}
+                        tick={{ fontSize: 11, fill: "var(--finsight-text)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        formatter={(v) => [`₹${formatINR(v)}`, "Budget"]}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
+                        contentStyle={{
+                          background: "var(--finsight-surface)",
+                          border: "1px solid var(--finsight-border)",
+                          borderRadius: "8px",
+                          fontSize: "13px",
+                        }}
+                      />
+                      <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={28}>
+                        {barData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
-                      </Pie>
-                      <Tooltip formatter={(v) => `₹${formatINR(v)}`} />
-                      <Legend />
-                    </PieChart>
+                      </Bar>
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {Object.entries(budget.budgets).map(([cat, amt]) => (
-                    <div key={cat} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--finsight-surface2)", borderRadius: "8px", fontSize: "12px" }}>
+                    <div
+                      key={cat}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "10px 14px",
+                        background: "var(--finsight-surface2)",
+                        borderRadius: "8px",
+                        fontSize: "0.875rem",
+                      }}
+                    >
                       <span style={{ color: "var(--finsight-text)" }}>{cat}</span>
-                      <span style={{ fontFamily: "Syne", fontWeight: 600, color: "var(--finsight-accent)" }}>₹{formatINR(Number(amt))}</span>
+                      <span style={{ fontWeight: 600, color: "var(--fs-green)" }}>₹{formatINR(Number(amt))}</span>
                     </div>
                   ))}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderTop: "1px solid var(--finsight-border)", marginTop: "4px", fontSize: "12px", fontWeight: 700 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px 14px",
+                      borderTop: "2px solid var(--finsight-border)",
+                      marginTop: "4px",
+                      fontSize: "0.875rem",
+                      fontWeight: 700,
+                    }}
+                  >
                     <span>Total</span>
-                    <span style={{ color: "var(--finsight-accent)" }}>₹{formatINR(totalBudget)}</span>
+                    <span style={{ color: "var(--fs-green)", fontFamily: "var(--font-display)" }}>
+                      ₹{formatINR(totalBudget)}
+                    </span>
                   </div>
                 </div>
               </div>
             </>
           )}
           {budget.explanation && (
-            <div style={{ fontSize: "12px", color: "var(--finsight-text)", lineHeight: 1.5, whiteSpace: "pre-wrap", marginTop: "16px" }}>
-              {budget.explanation}
+            <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid var(--finsight-border)" }}>
+              <div
+                style={{
+                  fontSize: "0.6875rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--finsight-muted)",
+                  marginBottom: "10px",
+                }}
+              >
+                Notes
+              </div>
+              <RichAdviceText text={budget.explanation} />
             </div>
           )}
         </div>

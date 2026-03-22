@@ -11,18 +11,16 @@ export default function Assistant() {
   return (
     <>
       <header className="finsight-header">
-        <div>
-          <div className="finsight-card-title" style={{ marginBottom: 0 }}>AI Assistant</div>
-          <p style={{ fontSize: "11px", color: "var(--finsight-muted)", marginTop: "4px" }}>Reports, budget, tax tips & chat</p>
-        </div>
+        <h1 className="finsight-header-title">Assistant</h1>
+        <p className="finsight-header-subtitle">Reports, budget suggestions, tax tips, and chat</p>
       </header>
-      <div className="finsight-main-grid" style={{ alignItems: "start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div className="finsight-main-grid" style={{ alignItems: "stretch" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div className="finsight-card"><ChatAssistant /></div>
           <div className="finsight-card"><BudgetGenerator /></div>
           <div className="finsight-card"><AnomalyExplainer /></div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div className="finsight-card"><IncomeAdviceCard /></div>
           <div className="finsight-card"><ReportView /></div>
           <div className="finsight-card"><LoanUploader /></div>

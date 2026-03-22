@@ -22,7 +22,8 @@ def _get_client() -> OpenAI | None:
     if not api_key:
         return None
     base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-    _client = OpenAI(api_key=api_key, base_url=base_url)
+    timeout_s = int(os.getenv("LLM_TIMEOUT_SECONDS", "180"))
+    _client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout_s)
     return _client
 
 

@@ -1,9 +1,15 @@
+"""
+DeepSeek Chat Completions (JSON mode) for transaction categorization fallback.
+
+Uses the OpenAI-compatible API at DEEPSEEK_BASE_URL with DEEPSEEK_API_KEY.
+"""
+
 from __future__ import annotations
 
 import json
 import os
 import re
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -12,10 +18,8 @@ from openai import OpenAI
 load_dotenv()
 
 
-class OllamaError(RuntimeError):
-    """
-    Kept for backwards-compatibility. Now represents DeepSeek-related errors.
-    """
+class DeepSeekJsonError(RuntimeError):
+    """Errors from DeepSeek JSON chat-completions calls."""
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -26,9 +30,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 def _extract_json_object(text: str) -> Optional[dict]:
-    """
-    Extract the first JSON object from a text blob (defensive against stray text).
-    """
+    """Extract the first JSON object from a text blob (defensive against stray text)."""
     if not text:
         return None
     m = re.search(r"\{[\s\S]*\}", text)
@@ -40,13 +42,10 @@ def _extract_json_object(text: str) -> Optional[dict]:
         return None
 
 
-class OllamaClient:
+class DeepSeekJsonClient:
     """
-    Backwards-compatible client wrapper.
-
-    Historically this talked to a local Ollama HTTP server, then to Groq.
-    It is now implemented on top of the DeepSeek chat-completions API while
-    preserving the same interface that the rest of the app expects.
+    Client for DeepSeek chat completions with JSON response format.
+    Used by LLMCategorizer when ML confidence is low or for PDF-only flows.
     """
 
     def __init__(
@@ -56,27 +55,26 @@ class OllamaClient:
         timeout_s: int = 20,
         enabled: bool | None = None,
     ):
-        # DeepSeek configuration (OpenAI-compatible client)
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
-            # If there's no API key we treat the client as disabled.
             self.client = None
             self.enabled = False
         else:
             ds_base = base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-            self.client = OpenAI(api_key=api_key, base_url=ds_base)
-            # Allow overriding default model via env, but keep a sensible default.
+            timeout_s = int(os.getenv("LLM_TIMEOUT_SECONDS", "120"))
+            self.client = OpenAI(api_key=api_key, base_url=ds_base, timeout=timeout_s)
             self.model = (
                 model
                 or os.getenv("DEEPSEEK_JSON_MODEL")
                 or os.getenv("DEEPSEEK_MODEL")
                 or "deepseek-chat"
             )
-            self.enabled = (
-                _env_bool("OLLAMA_ENABLED", True) if enabled is None else bool(enabled)
-            )
+            # Allow disabling LLM categorization without removing the API key
+            if enabled is None:
+                self.enabled = _env_bool("LLM_CATEGORIZATION_ENABLED", True)
+            else:
+                self.enabled = bool(enabled)
 
-        # Retain timeout attribute in case future logic relies on it.
         self.timeout_s = timeout_s
 
     def generate_json(
@@ -86,13 +84,11 @@ class OllamaClient:
         system: str | None = None,
         temperature: float = 0.1,
     ) -> Dict[str, Any]:
-        """
-        Call DeepSeek chat completions and return a parsed JSON object.
-        """
+        """Call DeepSeek chat completions and return a parsed JSON object."""
         if not self.enabled or not self.client:
-            raise OllamaError(
+            raise DeepSeekJsonError(
                 "DeepSeek client is disabled or DEEPSEEK_API_KEY is missing. "
-                "Set DEEPSEEK_API_KEY in your environment and ensure OLLAMA_ENABLED is not false."
+                "Set DEEPSEEK_API_KEY and LLM_CATEGORIZATION_ENABLED=true (default)."
             )
 
         messages = []
@@ -109,13 +105,11 @@ class OllamaClient:
                 response_format={"type": "json_object"},
             )
         except Exception as e:
-            raise OllamaError(f"DeepSeek API request failed: {e}")
+            raise DeepSeekJsonError(f"DeepSeek API request failed: {e}")
 
         content = (response.choices[0].message.content or "").strip()
 
-        # Be defensive: strip markdown fences if the model adds them.
         if content.startswith("```"):
-            # Split off fences and optional "json" language hint
             parts = content.split("```")
             if len(parts) >= 2:
                 content = parts[1].strip()
@@ -124,16 +118,15 @@ class OllamaClient:
 
         obj = _extract_json_object(content)
         if obj is None:
-            # Try direct JSON parse as a fallback
             try:
                 obj = json.loads(content)
             except Exception as e:
-                raise OllamaError(
+                raise DeepSeekJsonError(
                     f"Could not parse DeepSeek JSON response: {str(e)} | raw: {content[:200]}"
                 )
 
         if not isinstance(obj, dict):
-            raise OllamaError(
+            raise DeepSeekJsonError(
                 f"DeepSeek JSON response is not an object as expected: {str(obj)[:200]}"
             )
 

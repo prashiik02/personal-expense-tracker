@@ -28,7 +28,7 @@ export default function LoanUploader() {
 
   return (
     <div>
-      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Loan Document Analyzer</div>
+      <div className="finsight-card-title">Loan document</div>
       <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} style={{ fontSize: "12px", color: "var(--finsight-muted)" }} />
       <div style={{ marginTop: "12px" }}>
         <button type="button" className="finsight-btn finsight-btn-primary" onClick={submit} disabled={loading || !file}>{loading ? "Uploading…" : "Upload & Analyze"}</button>

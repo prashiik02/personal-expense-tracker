@@ -30,7 +30,11 @@ class Config:
                 f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
             )
         else:
-            SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(basedir, 'expense_tracker.db')}"
+            instance_dir = os.path.join(basedir, "instance")
+            os.makedirs(instance_dir, exist_ok=True)
+            db_file = os.path.join(instance_dir, "auth_app.db")
+            abs_path = os.path.abspath(db_file).replace("\\", "/")
+            SQLALCHEMY_DATABASE_URI = f"sqlite:///{abs_path}"
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 

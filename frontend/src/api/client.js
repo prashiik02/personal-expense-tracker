@@ -5,6 +5,9 @@ const baseURL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
 const API = axios.create({ baseURL });
 
+// LLM operations (categorization with Gemini/DeepSeek, PDF analyze) can take several minutes
+const LLM_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
 API.interceptors.request.use((config) => {
   try {
     const stored = localStorage.getItem("user");
@@ -20,5 +23,6 @@ API.interceptors.request.use((config) => {
   }
   return config;
 });
-export { API };
+
+export { API, LLM_TIMEOUT_MS };
 export default API;

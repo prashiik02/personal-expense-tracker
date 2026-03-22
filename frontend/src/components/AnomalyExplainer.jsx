@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { explainAnomaly } from "../api/assistantApi";
+import RichAdviceText from "./RichAdviceText";
 
 export default function AnomalyExplainer() {
   const [date, setDate] = useState("");
@@ -23,7 +24,7 @@ export default function AnomalyExplainer() {
 
   return (
     <div>
-      <div className="finsight-card-title" style={{ marginBottom: "16px" }}>Anomaly Explainer</div>
+      <div className="finsight-card-title">Anomaly Explainer</div>
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <input className="finsight-input" placeholder="Date (YYYY-MM-DD)" value={date} onChange={(e) => setDate(e.target.value)} />
         <input className="finsight-input" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -39,8 +40,8 @@ export default function AnomalyExplainer() {
       {result && !result.error && result.explanation && (
         <div style={{ marginTop: "16px" }}>
           <div style={{ fontSize: "10px", color: "var(--finsight-muted)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Explanation</div>
-          <div style={{ padding: "12px", background: "var(--finsight-surface2)", borderRadius: "10px", fontSize: "12px", whiteSpace: "pre-wrap", border: "1px solid var(--finsight-border)", lineHeight: 1.5 }}>
-            {result.explanation}
+          <div style={{ padding: "14px 16px", background: "var(--finsight-surface2)", borderRadius: "10px", border: "1px solid var(--finsight-border)" }}>
+            <RichAdviceText text={result.explanation} />
           </div>
         </div>
       )}

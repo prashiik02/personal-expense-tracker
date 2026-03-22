@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export const ThemeContext = createContext(null);
 
@@ -11,6 +11,7 @@ function normalizeTheme(value) {
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => normalizeTheme(localStorage.getItem(STORAGE_KEY)));
+  const themeTransitionTimer = useRef(null);
 
   useEffect(() => {
     const t = normalizeTheme(theme);
@@ -22,7 +23,16 @@ export function ThemeProvider({ children }) {
   }, [theme]);
 
   const toggleTheme = useCallback(() => {
+    const root = document.documentElement;
+    root.classList.add("finsight-theme-transition");
+    if (themeTransitionTimer.current) {
+      window.clearTimeout(themeTransitionTimer.current);
+    }
     setTheme((prev) => (normalizeTheme(prev) === "dark" ? "light" : "dark"));
+    themeTransitionTimer.current = window.setTimeout(() => {
+      root.classList.remove("finsight-theme-transition");
+      themeTransitionTimer.current = null;
+    }, 420);
   }, []);
 
   const value = useMemo(() => ({ theme: normalizeTheme(theme), setTheme, toggleTheme }), [theme, toggleTheme]);

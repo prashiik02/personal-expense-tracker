@@ -1,17 +1,17 @@
-import { API } from "./client";
+import { API, LLM_TIMEOUT_MS } from "./client";
 
 export const categorizeSingle = async (payload) => {
-  const res = await API.post("/categorize", payload);
+  const res = await API.post("/categorize", payload, { timeout: LLM_TIMEOUT_MS });
   return res.data;
 };
 
 export const categorizeBatch = async (payload) => {
-  const res = await API.post("/categorize/batch", payload);
+  const res = await API.post("/categorize/batch", payload, { timeout: LLM_TIMEOUT_MS });
   return res.data;
 };
 
 export const categorizeSms = async (payload) => {
-  const res = await API.post("/categorize/sms", payload);
+  const res = await API.post("/categorize/sms", payload, { timeout: LLM_TIMEOUT_MS });
   return res.data;
 };
 

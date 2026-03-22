@@ -5,15 +5,17 @@ import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const firstName = (user?.name || user?.email || "?").split(" ")[0];
 
   return (
-    <header className="finsight-header" style={{ padding: "16px 24px", borderBottom: "1px solid var(--finsight-border)", background: "var(--finsight-surface)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "32px" }}>
-        <Link to="/" className="finsight-logo" style={{ textDecoration: "none", color: "var(--finsight-text)" }}>
-          Fin<span>Sight</span>
+    <header className="finsight-nav">
+      <div className="finsight-nav-inner">
+        <Link to="/" className="finsight-logo finsight-logo-serif">
+          <span className="finsight-logo-mark" aria-hidden />
+          FinSight
         </Link>
         {user && (
-          <nav style={{ display: "flex", gap: "4px" }}>
+          <nav className="finsight-nav-links">
             <NavLink to="/" end className={({ isActive }) => "finsight-nav-link" + (isActive ? " active" : "")}>
               Dashboard
             </NavLink>
@@ -21,27 +23,19 @@ export default function Navbar() {
               Categorize
             </NavLink>
             <NavLink to="/assistant" className={({ isActive }) => "finsight-nav-link" + (isActive ? " active" : "")}>
-              AI Assistant
+              Assistant
             </NavLink>
           </nav>
         )}
       </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        {user && (
-          <span style={{ fontSize: "12px", color: "var(--finsight-muted)" }}>
-            {user.email}
-          </span>
-        )}
+      <div className="finsight-nav-right">
+        {user && <span className="finsight-nav-email">{firstName}</span>}
         <ThemeToggle />
-        <button
-          type="button"
-          onClick={logout}
-          className="finsight-btn"
-          style={{ padding: "6px 14px", fontSize: "11px" }}
-        >
-          Logout
-        </button>
+        {user && (
+          <button type="button" onClick={logout} className="finsight-btn finsight-btn-black" style={{ padding: "8px 16px", fontSize: "0.875rem" }}>
+            Log out
+          </button>
+        )}
       </div>
     </header>
   );
